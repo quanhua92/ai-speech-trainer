@@ -22,7 +22,7 @@
   }
 </style>
 <style>
-  .ph { display:inline-block; padding:1px 6px; margin:1px; border-radius:4px; border:1px solid transparent; }
+  .ph { display:inline-block; padding:1px 6px; margin:1px; border-radius:4px; border:1px solid transparent; cursor:pointer; }
   .ph.match { color:var(--color-muted); }
   .ph.sub   { color:var(--color-bad); border-color:var(--color-bad); }
   .ph.del   { color:var(--color-del); border-color:var(--color-del); text-decoration:line-through; }
@@ -68,6 +68,7 @@
           <option value="">— existing references —</option>
         </select>
       </div>
+      <div id="ref-text-display" class="text-sm text-text mt-2 mb-1 italic"></div>
       <audio id="ref-audio" controls class="w-full mt-2"></audio>
     </section>
 
@@ -166,6 +167,18 @@ async function jpost(url, body) {
 }
 function setStatus(el, msg, isErr) { el.textContent = msg; el.className = isErr ? "text-bad text-xs" : "text-muted text-xs"; }
 function gradeClass(g) { return "g-" + (g || ""); }
+function seekAudio(elId, ratio) {
+  // Seek BOTH audio players to ~1s before the proportional position so the
+  // whole word/sound is heard in context, not just its first frame.
+  ["ref-audio", "user-audio"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.duration && !isNaN(el.duration)) {
+      el.currentTime = Math.max(0, ratio * el.duration - 0.5);
+    }
+  });
+  // Always play the attempt; reference is positioned for manual comparison
+  document.getElementById("user-audio")?.play().catch(() => {});
+}
 
 /* ---------- health ---------- */
 async function refreshHealth() {
@@ -186,12 +199,14 @@ async function refreshHealth() {
 async function loadReferences() {
   try {
     const refs = await jget(`${API}/references`);
-    const opts = refs.map(r => `<option value="${r.id}">${r.id} — "${r.text.slice(0,40)}" (${r.duration_seconds}s)</option>`);
+    const opts = refs.map(r => `<option value="${r.id}" data-text="${r.text.replace(/"/g, '&quot;')}">${r.id} — "${r.text.slice(0,40)}" (${r.duration_seconds}s)</option>`);
     document.getElementById("ref-select").innerHTML = `<option value="">${t("existing")}</option>` + opts.join("");
     if (refs.length) {
       const preferred = "how-are-you-doing-today";
       const id = refs.some(r => r.id === preferred) ? preferred : refs[0].id;
+      const ref = refs.find(r => r.id === id);
       document.getElementById("ref-select").value = id;
+      document.getElementById("ref-text-display").textContent = ref ? ref.text : "";
       setAudio("ref-audio", `${API}/references/${id}/audio`, "reference(load)");
     }
   } catch (e) { console.error(e); }
@@ -213,6 +228,11 @@ function playSelectedReference() {
   const id = document.getElementById("ref-select").value;
   if (!id) return;
   setAudio("ref-audio", `${API}/references/${id}/audio`, "reference(select)");
+  document.getElementById("ref-audio").play().catch(() => {});
+  // show the full text below the dropdown
+  const sel = document.getElementById("ref-select");
+  const opt = [...sel.options].find(o => o.value === id);
+  if (opt) document.getElementById("ref-text-display").textContent = opt.dataset.text || "";
 }
 
 /* ---------- recording ---------- */
@@ -318,14 +338,20 @@ function renderResults(res) {
     : e.type === "del" ? `missing /${e.expected}/`
     : `extra /${e.actual}/`).join("; ");
   document.getElementById("word-diff").innerHTML = (res.words && res.words.length)
-    ? res.words.map(w => `<span class="ph ${w.status === "match" ? "match" : w.status}" title="${errsToStr(w.errors) || "ok"}">${w.word}</span>`).join(" ")
+    ? res.words.map((w, j) => {
+        const ratio = (j / res.words.length).toFixed(3);
+        const target = w.status === "del" ? "ref-audio" : "user-audio";
+        return `<span class="ph ${w.status === "match" ? "match" : w.status}" title="click to play" onclick="seekAudio('${target}',${ratio})">${w.word}</span>`;
+      }).join(" ")
     : `<span class="text-muted text-sm">(needs reference text)</span>`;
 
-  document.getElementById("phoneme-diff").innerHTML = res.phoneme_diff.map(op => {
-    if (op.type === "match") return `<span class="ph match">/${op.phoneme}/</span>`;
-    if (op.type === "sub")   return `<span class="ph sub" title="expected /${op.expected}/">/${op.actual}/</span>`;
-    if (op.type === "del")   return `<span class="ph del" title="deleted">/${op.expected}/</span>`;
-    return `<span class="ph ins" title="inserted">/${op.actual}/</span>`;
+  document.getElementById("phoneme-diff").innerHTML = res.phoneme_diff.map((op, i) => {
+    const ratio = (i / res.phoneme_diff.length).toFixed(3);
+    const target = op.type === "del" ? "ref-audio" : "user-audio";
+    if (op.type === "match") return `<span class="ph match" title="click to play" onclick="seekAudio('${target}',${ratio})">/${op.phoneme}/</span>`;
+    if (op.type === "sub")   return `<span class="ph sub" title="expected /${op.expected}/ — click to play" onclick="seekAudio('${target}',${ratio})">/${op.actual}/</span>`;
+    if (op.type === "del")   return `<span class="ph del" title="deleted — click to hear reference" onclick="seekAudio('${target}',${ratio})">/${op.expected}/</span>`;
+    return `<span class="ph ins" title="inserted — click to play" onclick="seekAudio('${target}',${ratio})">/${op.actual}/</span>`;
   }).join(" ") || `<span class="text-muted text-sm">(empty)</span>`;
 
   document.getElementById("feedback").innerHTML = res.feedback.map(f => `<li class="my-0.5">• ${f}</li>`).join("") || `<li class="text-muted">none</li>`;
