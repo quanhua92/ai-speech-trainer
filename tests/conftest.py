@@ -13,6 +13,24 @@ import pytest
 import soundfile as sf
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--runslow",
+        action="store_true",
+        default=False,
+        help="run slow tests that download / load ML models (wav2vec2, kokoro)",
+    )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    if config.getoption("--runslow"):
+        return
+    skip_slow = pytest.mark.skip(reason="needs --runslow (downloads a model)")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
+
+
 def _sine(
     duration: float = 1.0,
     sr: int = 16000,
@@ -69,3 +87,22 @@ def quiet_wav(tmp_path: Path) -> Path:
 def silent_wav(tmp_path: Path) -> Path:
     """A 0.5s mono pure-silence clip."""
     return _write(tmp_path / "silent.wav", np.zeros(8000, dtype=np.float32), 16000)
+
+
+@pytest.fixture(scope="session")
+def kokoro_ref_wav(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A Kokoro-generated native reference (24kHz) for slow model tests.
+
+    Only evaluated when a test depending on it actually runs (i.e. under
+    ``--runslow``). Loads Kokoro + espeak-ng once per session.
+    """
+    import soundfile as sf
+    from kokoro import KPipeline
+
+    pipeline = KPipeline(lang_code="a")
+    text = "Hello world, this is a Kokoro TTS test."
+    out = tmp_path_factory.mktemp("kokoro") / "ref.wav"
+    for _gs, _ps, audio in pipeline(text, voice="af_heart"):
+        sf.write(str(out), audio, 24000)
+        break  # short sentence -> single chunk
+    return out

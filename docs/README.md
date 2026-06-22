@@ -222,17 +222,18 @@ Because a user might speak slower or faster than the native reference without ne
 
 ---
 
-### Phase 2 — Phoneme Extraction & Comparison
+### Phase 2 — Phoneme Extraction & Comparison ✅
 
 > **Goal:** Achieve phoneme-level pronunciation feedback.
+> **Done** — see [`phoneme-extraction.md`](phoneme-extraction.md) for the full API reference.
 
-- [ ] Integrate `transformers` + Wav2Vec2-CTC phoneme model
-- [ ] Implement CTC decoding → raw phoneme sequence extraction
-- [ ] Build phoneme diff engine using `difflib.SequenceMatcher`
-- [ ] Generate human-readable diff output (insertions / deletions / substitutions)
-- [ ] Compute Phoneme Error Rate (PER) as a numeric score
-- [ ] Test with known-good vs. known-bad pronunciation pairs
-- [ ] Handle edge cases: empty audio, very short clips, noise-only input
+- [x] Integrate `transformers` + Wav2Vec2-CTC phoneme model
+- [x] Implement CTC decoding → raw phoneme sequence extraction
+- [x] Build phoneme diff engine using `difflib.SequenceMatcher`
+- [x] Generate human-readable diff output (insertions / deletions / substitutions)
+- [x] Compute Phoneme Error Rate (PER) as a numeric score
+- [x] Test with known-good vs. known-bad pronunciation pairs
+- [x] Handle edge cases: empty audio, very short clips, noise-only input
 
 **Key Metric:** `Phoneme Error Rate (PER)` — lower is better.
 

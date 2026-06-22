@@ -24,6 +24,10 @@ format-check:
 test:
     uv run pytest
 
+# Run slow tests that download/load ML models (wav2vec2, kokoro). ~15s after cache.
+test-slow:
+    PYTORCH_ENABLE_MPS_FALLBACK=1 uv run pytest --runslow
+
 # Run tests with coverage.
 test-cov:
     uv run pytest --cov=ai_speech_shadowing --cov-report=term-missing
