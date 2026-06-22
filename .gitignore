@@ -224,8 +224,14 @@ TODO*
 # Temp
 tmp/
 
-# Generated audio data (references, user recordings) — runtime-generated, regenerable
-data/
+# Runtime user data (regenerable). Default references ARE tracked (data/references/).
+data/recordings/
+data/history/
+
+# Pre-warmed model cache (populated from ~/.cache/huggingface for fast offline
+# Docker builds). Huge and machine-specific — keep the dir via .gitkeep only.
+data/models/*
+!data/models/.gitkeep
 
 # AI agent MCP configs — local developer use only, never ship in this repo.
 # End users paste these into their own projects; opensilk is installed, not cloned.

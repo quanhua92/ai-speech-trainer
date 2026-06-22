@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      context: .
+      # Build for the host's native arch: linux/arm64 on Apple Silicon (fast,
+      # native), linux/amd64 on an x86_64 server. Don't pin `platform`.
+    ports:
+      - "8000:8000"
+    environment:
+      HF_HOME: /models
+    volumes:
+      # Named volume → persists user recordings, history, and any new references.
+      # On first create Docker seeds it from the image's /app/data (the bundled
+      # default references), so the demo is populated immediately.
+      - app-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - /app/.venv/bin/python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health').read()"
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
+volumes:
+  app-data:

@@ -1,0 +1,20 @@
+.git
+.gitignore
+.venv
+.ruff_cache
+.mypy_cache
+.pytest_cache
+**/__pycache__
+**/*.pyc
+tmp
+tests
+docs
+LICENSE
+Justfile
+githooks
+scripts/explore_kokoro.py
+scripts/test_e2e.py
+scripts/README.md
+# runtime user data is never baked; only data/references/ (defaults) is copied
+data/recordings
+data/history

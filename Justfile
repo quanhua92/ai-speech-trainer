@@ -36,6 +36,22 @@ serve:
 e2e:
     PYTORCH_ENABLE_MPS_FALLBACK=1 uv run python scripts/test_e2e.py
 
+# Build the Docker image (bakes Kokoro + Wav2Vec2 models; ~3 GB, one-time).
+compose-build:
+    docker compose build
+
+# Build (if needed) and run the demo container. Open http://127.0.0.1:8000/demo.
+compose-up:
+    docker compose up --build
+
+# Stop and remove the container (the app-data volume is kept).
+compose-down:
+    docker compose down
+
+# Tail container logs.
+compose-logs:
+    docker compose logs -f
+
 # Run tests with coverage.
 test-cov:
     uv run pytest --cov=ai_speech_shadowing --cov-report=term-missing

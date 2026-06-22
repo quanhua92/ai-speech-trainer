@@ -1,0 +1,13 @@
+{
+  "text": "Speech shadowing helps you sound like a native speaker.",
+  "language": "en-us",
+  "default_speaker": "af_heart",
+  "updated_at": "2026-06-22T13:45:32+00:00",
+  "audio": {
+    "kokoro-en-us": {
+      "file": "audio/kokoro-en-us/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    }
+  }
+}
