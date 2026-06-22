@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -16,6 +18,13 @@ from ai_speech_shadowing.core.feedback import (
     to_terminal,
 )
 from ai_speech_shadowing.core.fluency import compare_fluency
+from ai_speech_shadowing.core.history import (
+    DEFAULT_HISTORY_DIR,
+    format_summary,
+    list_reports,
+    load_report,
+    save_report,
+)
 from ai_speech_shadowing.core.phoneme import get_extractor
 from ai_speech_shadowing.core.preprocess import preprocess
 from ai_speech_shadowing.core.prosody import (
@@ -36,6 +45,18 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+@app.callback()
+def _root(
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable debug logging.")] = False,
+    quiet: Annotated[
+        bool, typer.Option("--quiet", "-q", help="Suppress non-warning logs.")
+    ] = False,
+) -> None:
+    """ai-speech-shadowing — local-first speech evaluation."""
+    level = logging.WARNING if quiet else (logging.DEBUG if verbose else logging.INFO)
+    logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
 
 
 @app.command("version")
@@ -269,15 +290,28 @@ def evaluate_cmd(
     no_preprocess: Annotated[
         bool, typer.Option("--no-preprocess", help="Skip preprocessing of both files.")
     ] = False,
+    no_save: Annotated[
+        bool,
+        typer.Option("--no-save", help="Do not persist the report to the history directory."),
+    ] = False,
+    history_dir: Annotated[
+        Path, typer.Option("--history-dir", help="Where to save the report.")
+    ] = DEFAULT_HISTORY_DIR,
 ) -> None:
     """Full evaluation: pronunciation + prosody + fluency → unified report.
 
     Loads the Wav2Vec2 phoneme model on first use (~1.2 GB download if cached).
+    The report is saved to the history directory unless --no-save is given.
     """
     prep = (lambda s: s) if no_preprocess else preprocess
     ref = prep(AudioSample.from_wav(reference))
     hyp = prep(AudioSample.from_wav(hypothesis))
+    typer.echo("Loading model & evaluating...", err=True)
     report = evaluate(ref, hyp, weights=_parse_weights(weights))
+
+    if not no_save:
+        path = save_report(report, history_dir=history_dir)
+        typer.echo(f"saved {path}", err=True)
 
     rendered = {
         "terminal": to_terminal,
@@ -341,3 +375,147 @@ def generate_reference_cmd(
         typer.echo(f"generated {len(paths)} reference(s) under {output_dir}")
         for p in paths:
             typer.echo(f"  {p}")
+
+
+@app.command("record")
+def record_cmd(
+    output: Annotated[
+        Path,
+        typer.Argument(dir_okay=False, help="Output WAV path."),
+    ],
+    duration: Annotated[float, typer.Option("--duration", "-d", help="Seconds to record.")] = 5.0,
+    sample_rate: Annotated[
+        int, typer.Option("--sample-rate", help="Recording sample rate (Hz).")
+    ] = TARGET_SAMPLE_RATE,
+) -> None:
+    """Record user audio from the microphone and write a WAV file."""
+    import sounddevice as sd
+    import soundfile as sf
+
+    typer.echo(f"Recording {duration:.1f}s at {sample_rate} Hz… (Ctrl-C to abort)", err=True)
+    try:
+        audio = sd.rec(
+            int(duration * sample_rate),
+            samplerate=sample_rate,
+            channels=1,
+            dtype="float32",
+        )
+        sd.wait()
+    except KeyboardInterrupt as e:
+        raise typer.Abort() from e
+    output.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(str(output), audio, sample_rate)
+    typer.echo(f"wrote {output}  ({duration:.1f}s, {sample_rate} Hz, mono)")
+
+
+_AUDIO_SUFFIXES: set[str] = {".wav", ".flac", ".ogg", ".aiff"}
+
+
+@app.command("batch")
+def batch_cmd(
+    reference: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="Reference (native) audio file to evaluate against.",
+        ),
+    ],
+    input_dir: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            dir_okay=True,
+            readable=True,
+            help="Directory of user recordings to evaluate.",
+        ),
+    ],
+    history_dir: Annotated[
+        Path, typer.Option("--history-dir", help="Where to save reports.")
+    ] = DEFAULT_HISTORY_DIR,
+    no_preprocess: Annotated[
+        bool, typer.Option("--no-preprocess", help="Skip preprocessing.")
+    ] = False,
+) -> None:
+    """Evaluate every recording in a directory against one reference.
+
+    Reports are saved to the history directory; a summary table is printed at
+    the end. Loads the phoneme model once and reuses it.
+    """
+    from rich.progress import (
+        BarColumn,
+        Progress,
+        TaskProgressColumn,
+        TextColumn,
+        TimeRemainingColumn,
+    )
+
+    recordings = sorted(p for p in input_dir.iterdir() if p.suffix.lower() in _AUDIO_SUFFIXES)
+    if not recordings:
+        raise typer.BadParameter(f"no audio files found in {input_dir}")
+
+    prep = (lambda s: s) if no_preprocess else preprocess
+    ref = prep(AudioSample.from_wav(reference))
+    typer.echo(f"Loading model & evaluating {len(recordings)} recording(s)…", err=True)
+    extractor = get_extractor()
+
+    results: list[tuple[str, int, str]] = []
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeRemainingColumn(),
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Evaluating", total=len(recordings))
+        for wav in recordings:
+            hyp = prep(AudioSample.from_wav(wav))
+            report = evaluate(ref, hyp, phoneme_extractor=extractor)
+            save_report(report, history_dir=history_dir)
+            results.append((wav.name, report.composite_score, report.composite_grade))
+            progress.advance(task)
+
+    typer.echo(f"Evaluated {len(results)} recording(s) (reports saved to {history_dir}):")
+    for name, score, grade in sorted(results, key=lambda r: -r[1]):
+        typer.echo(f"  {score:>3}/100  {grade:<10}  {name}")
+
+
+@app.command("report")
+def report_cmd(
+    report_id: Annotated[
+        str | None,
+        typer.Argument(help="Report id; omit to list all saved reports."),
+    ] = None,
+    history_dir: Annotated[
+        Path, typer.Option("--history-dir", help="History directory.")
+    ] = DEFAULT_HISTORY_DIR,
+    fmt: Annotated[
+        str,
+        typer.Option("--format", "-f", help="View format: 'summary' (default) or 'json'."),
+    ] = "summary",
+    list_only: Annotated[
+        bool,
+        typer.Option("--list", help="Always list, even if a report id is given."),
+    ] = False,
+) -> None:
+    """List saved evaluation reports, or view one in detail."""
+    if report_id is None or list_only:
+        entries = list_reports(history_dir)
+        if not entries:
+            typer.echo("(no saved reports)")
+            return
+        for entry in entries:
+            typer.echo(
+                f"{entry.id}  {entry.composite_score:>3}/100  "
+                f"{entry.composite_grade:<10}  {entry.created_at}"
+            )
+        return
+
+    data = load_report(report_id, history_dir)
+    if data is None:
+        raise typer.BadParameter(f"no report with id {report_id!r} in {history_dir}")
+    if fmt.lower() == "json":
+        typer.echo(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        typer.echo(format_summary(data))

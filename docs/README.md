@@ -337,20 +337,21 @@ graph TD
 
 ---
 
-### Phase 7 — CLI Interface
+### Phase 7 — CLI Interface ✅
 
 > **Goal:** Provide a developer-friendly command-line workflow.
+> **Done** — see [`cli.md`](cli.md) for the full command reference.
 
-- [ ] Implement CLI with `Typer` (or `Click`)
-- [ ] Commands:
+- [x] Implement CLI with `Typer` (or `Click`)
+- [x] Commands:
   - `record` — Record user audio from microphone
   - `evaluate` — Run full pipeline on a user + reference pair
-  - `generate` — Generate reference audio from text
+  - `generate-reference` — Generate reference audio from text  *(named `generate-reference` per the Phase 6 spec)*
   - `batch` — Evaluate a directory of recordings
   - `report` — View past evaluation reports
-- [ ] Add `--verbose` / `--json` / `--quiet` output flags
-- [ ] Add progress bars for long operations (model loading, batch eval)
-- [ ] Write CLI integration tests
+- [x] Add `--verbose` / `--json` / `--quiet` output flags  *(global `--verbose`/`--quiet`; JSON via per-command `--format json`)*
+- [x] Add progress bars for long operations (model loading, batch eval)
+- [x] Write CLI integration tests
 
 ---
 
