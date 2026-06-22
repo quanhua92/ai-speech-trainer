@@ -321,18 +321,19 @@ graph TD
 
 ---
 
-### Phase 6 — TTS Reference Generation
+### Phase 6 — TTS Reference Generation ✅
 
 > **Goal:** Automate gold-standard native audio creation.
+> **Done** — see [`tts-reference.md`](tts-reference.md) for the full API reference.
 
-- [ ] Integrate **Kokoro** TTS for lightning-fast, real-time reference generation
-- [ ] Provide instructions/scripts for users to generate high-fidelity offline references (e.g., using Qwen TTS) and organize them manually
-- [ ] Build a `generate-reference` CLI command: text → WAV (via Kokoro)
-- [ ] Support batch generation from a sentence list file
-- [ ] Organize references using a short slug directory structure (e.g., `data/references/hello-world/`)
-- [ ] Add `metadata.json` to each slug folder (text, language, default speaker)
-- [ ] Store audio files within a voice profile subfolder (e.g., `data/references/hello-world/audio/kokoro-en-us/`)
-- [ ] Cache & skip regeneration if reference already exists
+- [x] Integrate **Kokoro** TTS for lightning-fast, real-time reference generation
+- [x] Provide instructions/scripts for users to generate high-fidelity offline references (e.g., using Qwen TTS) and organize them manually
+- [x] Build a `generate-reference` CLI command: text → WAV (via Kokoro)
+- [x] Support batch generation from a sentence list file
+- [x] Organize references using a short slug directory structure (e.g., `data/references/hello-world/`)
+- [x] Add `metadata.json` to each slug folder (text, language, default speaker)
+- [x] Store audio files within a voice profile subfolder (e.g., `data/references/hello-world/audio/kokoro-en-us/`)
+- [x] Cache & skip regeneration if reference already exists
 
 ---
 

@@ -23,6 +23,12 @@ from ai_speech_shadowing.core.prosody import (
     DEFAULT_PITCH_FLOOR,
     extract_pitch,
 )
+from ai_speech_shadowing.tts.generator import (
+    ReferenceConfig,
+    ReferenceManager,
+    parse_sentence_list,
+    slugify,
+)
 
 app = typer.Typer(
     name="ai-speech-shadowing",
@@ -281,3 +287,57 @@ def evaluate_cmd(
     if rendered is None:
         raise typer.BadParameter(f"unknown format {fmt!r}; use terminal|json|markdown")
     typer.echo(rendered(report))
+
+
+@app.command("generate-reference")
+def generate_reference_cmd(
+    text: Annotated[
+        str | None,
+        typer.Option("--text", "-t", help="Single sentence to synthesize."),
+    ] = None,
+    list_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--list",
+            "-l",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="File of sentences (one per line; '#'-prefixed lines are comments).",
+        ),
+    ] = None,
+    voice: Annotated[str, typer.Option("--voice", help="Kokoro voice name.")] = "af_heart",
+    lang: Annotated[
+        str, typer.Option("--lang", help="Kokoro single-letter language code (a=en-us).")
+    ] = "a",
+    output_dir: Annotated[
+        Path, typer.Option("--output-dir", "-o", help="References base directory.")
+    ] = Path("data/references"),
+    force: Annotated[
+        bool, typer.Option("--force", help="Regenerate even if a cached reference exists.")
+    ] = False,
+) -> None:
+    """Generate a Kokoro TTS reference (or a batch) under data/references/<slug>/.
+
+    Provide exactly one of --text (single) or --list (batch file). The first
+    call downloads the Kokoro-82M model (~330 MB).
+    """
+    if text is None and list_file is None:
+        raise typer.BadParameter("provide --text <sentence> or --list <file>")
+    if text is not None and list_file is not None:
+        raise typer.BadParameter("provide --text OR --list, not both")
+
+    config = ReferenceConfig(base_dir=output_dir, default_voice=voice, default_lang=lang)
+    mgr = ReferenceManager(config)
+
+    if text is not None:
+        out = mgr.generate(text, voice=voice, lang=lang, force=force)
+        typer.echo(f"wrote {out}  (slug: {slugify(text)})")
+    else:
+        sentences = parse_sentence_list(list_file)
+        if not sentences:
+            raise typer.BadParameter(f"no sentences found in {list_file}")
+        paths = mgr.generate_batch(sentences, voice=voice, lang=lang, force=force)
+        typer.echo(f"generated {len(paths)} reference(s) under {output_dir}")
+        for p in paths:
+            typer.echo(f"  {p}")

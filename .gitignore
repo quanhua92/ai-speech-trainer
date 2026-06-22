@@ -224,6 +224,9 @@ TODO*
 # Temp
 tmp/
 
+# Generated audio data (references, user recordings) — runtime-generated, regenerable
+data/
+
 # AI agent MCP configs — local developer use only, never ship in this repo.
 # End users paste these into their own projects; opensilk is installed, not cloned.
 .mcp.json
