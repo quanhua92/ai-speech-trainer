@@ -59,6 +59,7 @@ COPY --from=builder /app/.venv        /app/.venv
 COPY --from=builder /app/src          /app/src
 COPY --from=builder /models           /models
 COPY --from=builder /app/data/references /app/data/references
+COPY static/                          /app/static/
 
 EXPOSE 8000
 ENTRYPOINT ["/app/.venv/bin/ai-speech-shadowing"]

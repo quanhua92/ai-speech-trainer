@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ai-speech-shadowing</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --color-bg: #0f1115;
+    --color-panel: #171a21;
+    --color-panel2: #1f2430;
+    --color-border: #2a3140;
+    --color-text: #e6e9ef;
+    --color-muted: #9aa4b2;
+    --color-accent: #6ea8fe;
+    --color-good: #4ade80;
+    --color-fair: #facc15;
+    --color-bad: #f87171;
+    --color-ins: #38bdf8;
+    --color-del: #fb923c;
+  }
+</style>
+<style>
+  .ph { display:inline-block; padding:1px 6px; margin:1px; border-radius:4px; border:1px solid transparent; }
+  .ph.match { color:var(--color-muted); }
+  .ph.sub   { color:var(--color-bad); border-color:var(--color-bad); }
+  .ph.del   { color:var(--color-del); border-color:var(--color-del); text-decoration:line-through; }
+  .ph.ins   { color:var(--color-ins); border-color:var(--color-ins); }
+  .g-good { color:var(--color-good); }
+  .g-fair { color:var(--color-fair); }
+  .g-needs_work { color:var(--color-bad); }
+</style>
+</head>
+<body class="bg-bg text-text min-h-screen" style="font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+
+<!-- Header -->
+<header class="border-b border-border px-4 py-3 flex items-center gap-4 flex-wrap">
+  <div>
+    <h1 class="text-base font-semibold m-0">ai-speech-shadowing</h1>
+    <div class="text-xs text-muted" id="hdr-sub">local-first speech evaluation · <a class="text-muted" href="/docs" target="_blank">API docs</a></div>
+  </div>
+  <div class="ml-auto flex gap-2 items-center">
+    <select id="ui-lang" onchange="changeLang()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1 text-xs">
+      <option value="en">English</option>
+      <option value="vi">Tiếng Việt</option>
+    </select>
+    <span class="badge text-xs px-2 py-1 rounded-full border border-border text-muted bg-panel" id="b-wav2vec2">wav2vec2: ...</span>
+    <span class="badge text-xs px-2 py-1 rounded-full border border-border text-muted bg-panel" id="b-tts">tts: ...</span>
+  </div>
+</header>
+
+<!-- Two-column layout on desktop; stacked on mobile -->
+<div class="lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-4 lg:p-4 max-w-7xl mx-auto p-3 flex flex-col gap-3 lg:block">
+
+  <!-- LEFT: Controls -->
+  <div class="flex flex-col gap-3">
+
+    <!-- 1 · Reference -->
+    <section class="bg-panel border border-border rounded-xl p-4">
+      <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-ref">1 · Reference (native target)</h2>
+      <div class="flex gap-2 flex-wrap items-start">
+        <textarea id="ref-text" placeholder="Type a sentence to synthesize…" rows="2" class="flex-1 min-w-[200px] bg-panel2 border border-border text-text rounded-md px-2.5 py-2 text-sm resize-vertical" style="font-family:inherit"></textarea>
+        <button onclick="createReference()" id="btn-gen" class="bg-accent text-bg border-0 rounded-md px-3.5 py-2 text-sm font-semibold cursor-pointer">Generate</button>
+        <button class="bg-panel2 text-text border border-border rounded-md px-3.5 py-2 text-sm" onclick="loadReferences()" id="btn-refresh">Refresh</button>
+      </div>
+      <div class="mt-2.5">
+        <select id="ref-select" onchange="playSelectedReference()" class="w-full bg-panel2 border border-border text-text rounded-md px-2.5 py-2 text-sm">
+          <option value="">— existing references —</option>
+        </select>
+      </div>
+      <audio id="ref-audio" controls class="w-full mt-2"></audio>
+    </section>
+
+    <!-- 2 · Attempt -->
+    <section class="bg-panel border border-border rounded-xl p-4">
+      <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-att">2 · Your attempt</h2>
+      <div class="flex gap-2 flex-wrap items-center">
+        <button id="rec-btn" onclick="toggleRecording()" class="bg-accent text-bg border-0 rounded-md px-3.5 py-2 text-sm font-semibold cursor-pointer">Record</button>
+        <span id="rec-status" class="text-muted text-xs">or</span>
+        <input type="file" id="file-input" accept=".wav,.flac,.ogg,.mp3" class="text-xs" />
+      </div>
+      <audio id="user-audio" controls class="w-full mt-2"></audio>
+      <div class="text-muted text-xs mt-1" id="user-info"></div>
+    </section>
+
+    <!-- 3 · Evaluate -->
+    <section class="bg-panel border border-border rounded-xl p-4">
+      <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-eval">3 · Evaluate</h2>
+      <div class="flex gap-2 items-center">
+        <button onclick="runEvaluate()" id="eval-btn" class="bg-accent text-bg border-0 rounded-md px-3.5 py-2 text-sm font-semibold cursor-pointer">Evaluate</button>
+        <span id="eval-status" class="text-muted text-xs"></span>
+      </div>
+      <details class="mt-2.5">
+        <summary class="text-muted text-xs cursor-pointer" id="summary-adv">Advanced settings</summary>
+        <div class="flex gap-2 flex-wrap items-center mt-2">
+          <label class="text-xs text-muted">Pron.</label>
+          <input type="number" id="w-pron" value="0.4" min="0" max="1" step="0.05" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
+          <label class="text-xs text-muted">Inton.</label>
+          <input type="number" id="w-into" value="0.3" min="0" max="1" step="0.05" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
+          <label class="text-xs text-muted">Fluency</label>
+          <input type="number" id="w-flu" value="0.3" min="0" max="1" step="0.05" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
+          <label class="text-xs text-muted" id="lbl-dtw">DTW scale</label>
+          <input type="number" id="w-dtw" value="1.0" min="0.1" max="10" step="0.1" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
+        </div>
+        <div class="text-muted text-xs mt-1" id="lbl-wnote">Weights normalise automatically (sum to 1.0).</div>
+      </details>
+    </section>
+
+  </div><!-- /left column -->
+
+  <!-- RIGHT: Output -->
+  <div class="flex flex-col gap-3">
+
+    <!-- 4 · Results -->
+    <section id="results" class="bg-panel border border-border rounded-xl p-4">
+      <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-res">4 · Results</h2>
+      <div id="results-empty" class="text-muted text-sm py-8 text-center">Record an attempt and click Evaluate to see scores, phoneme alignment, and feedback here.</div>
+      <div id="results-content" class="hidden">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2" id="score-cards"></div>
+        <h3 class="text-xs text-muted mt-3.5 mb-1" id="h3-word">Word highlight <span class="text-muted">(best-effort)</span></h3>
+        <div id="word-diff" style="font-size:17px;line-height:2"></div>
+        <h3 class="text-xs text-muted mt-3.5 mb-1" id="h3-phon">Phoneme alignment <span class="text-muted">(exact)</span></h3>
+        <div id="phoneme-diff" style="font-family:ui-monospace,Menlo,monospace;line-height:1.9;font-size:15px"></div>
+        <h3 class="text-xs text-muted mt-3.5 mb-1" id="h3-fb">Feedback</h3>
+        <ul id="feedback" class="m-1 p-0 list-none"></ul>
+      </div>
+    </section>
+
+    <!-- 5 · History -->
+    <section class="bg-panel border border-border rounded-xl p-4 flex flex-col">
+      <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-hist">5 · History</h2>
+      <div id="history-list" class="lg:max-h-[45vh] lg:overflow-y-auto flex-1"></div>
+    </section>
+
+  </div><!-- /right column -->
+
+</div><!-- /layout -->
+
+<script>
+const API = "/api/v1";
+let userBlob = null;
+let recState = "idle";
+let media = { ctx: null, stream: null, source: null, proc: null, frames: [], rate: 48000 };
+
+/* ---------- helpers ---------- */
+async function jget(url) { const r = await fetch(url); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json(); }
+function setAudio(elId, url, label) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  console.log(`[audio] ${label} ->`, url);
+  el.onerror = () => console.error(`[audio] ${label} LOAD ERROR`, url, el.error);
+  el.onloadstart = () => console.log(`[audio] ${label} loading…`);
+  el.oncanplay = () => console.log(`[audio] ${label} ready (duration ${el.duration}s)`);
+  el.src = url; el.pause(); el.currentTime = 0;
+  return el;
+}
+async function jpost(url, body) {
+  const opts = { method: "POST" };
+  if (body != null) {
+    if (typeof body === "string") { opts.body = body; opts.headers = { "Content-Type": "application/json" }; }
+    else { opts.body = body; }
+  }
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+function setStatus(el, msg, isErr) { el.textContent = msg; el.className = isErr ? "text-bad text-xs" : "text-muted text-xs"; }
+function gradeClass(g) { return "g-" + (g || ""); }
+
+/* ---------- health ---------- */
+async function refreshHealth() {
+  try {
+    const h = await jget(`${API}/health`);
+    const set = (id, key) => {
+      const el = document.getElementById(id);
+      const m = h.models[key];
+      el.textContent = `${key}: ${m.loaded ? "loaded" : "idle"}${m.load_time_ms ? ` (${m.load_time_ms}ms)` : ""}`;
+      el.classList.toggle("text-good", m.loaded);
+      el.classList.toggle("border-good", m.loaded);
+    };
+    set("b-wav2vec2", "wav2vec2"); set("b-tts", "tts");
+  } catch {}
+}
+
+/* ---------- references ---------- */
+async function loadReferences() {
+  try {
+    const refs = await jget(`${API}/references`);
+    const opts = refs.map(r => `<option value="${r.id}">${r.id} — "${r.text.slice(0,40)}" (${r.duration_seconds}s)</option>`);
+    document.getElementById("ref-select").innerHTML = `<option value="">${t("existing")}</option>` + opts.join("");
+    if (refs.length) {
+      const preferred = "how-are-you-doing-today";
+      const id = refs.some(r => r.id === preferred) ? preferred : refs[0].id;
+      document.getElementById("ref-select").value = id;
+      setAudio("ref-audio", `${API}/references/${id}/audio`, "reference(load)");
+    }
+  } catch (e) { console.error(e); }
+}
+async function createReference() {
+  const text = document.getElementById("ref-text").value.trim();
+  if (!text) return;
+  const btn = document.getElementById("btn-gen"); btn.disabled = true; btn.textContent = "...";
+  try {
+    const ref = await jpost(`${API}/references`, JSON.stringify({ text, language: "en", speaker: "default" }));
+    await loadReferences();
+    document.getElementById("ref-select").value = ref.id;
+    setAudio("ref-audio", `${API}/references/${ref.id}/audio`, "reference(gen)");
+    refreshHealth();
+  } catch (e) { alert("Failed: " + e.message); }
+  btn.disabled = false; btn.textContent = t("gen");
+}
+function playSelectedReference() {
+  const id = document.getElementById("ref-select").value;
+  if (!id) return;
+  setAudio("ref-audio", `${API}/references/${id}/audio`, "reference(select)");
+}
+
+/* ---------- recording ---------- */
+async function toggleRecording() { if (recState === "idle") return startRecording(); return stopRecording(); }
+async function startRecording() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert("Microphone needs HTTPS or localhost."); return;
+  }
+  try { media.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+  catch (e) { alert("Mic denied: " + e.message); return; }
+  media.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  media.rate = media.ctx.sampleRate;
+  media.source = media.ctx.createMediaStreamSource(media.stream);
+  const proc = media.ctx.createScriptProcessor(4096, 1, 1);
+  media.frames = [];
+  proc.onaudioprocess = e => media.frames.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  media.source.connect(proc); proc.connect(media.ctx.destination); media.proc = proc;
+  recState = "recording";
+  const btn = document.getElementById("rec-btn");
+  btn.textContent = "Stop"; btn.classList.add("bg-bad");
+  document.getElementById("rec-status").textContent = "recording…";
+}
+function stopRecording() {
+  if (!media.proc) return;
+  media.proc.disconnect(); media.source.disconnect();
+  media.stream.getTracks().forEach(t => t.stop()); media.ctx.close();
+  const total = media.frames.reduce((n, f) => n + f.length, 0);
+  const merged = new Float32Array(total);
+  for (let i = 0, off = 0; i < media.frames.length; i++) { merged.set(media.frames[i], off); off += media.frames[i].length; }
+  setUserAudio(encodeWav(merged, media.rate), `recorded @ ${media.rate} Hz, ${(total/media.rate).toFixed(1)}s`);
+  recState = "idle";
+  const btn = document.getElementById("rec-btn");
+  btn.textContent = t("record"); btn.classList.remove("bg-bad");
+  document.getElementById("rec-status").textContent = t("rec_or");
+}
+document.getElementById("file-input").addEventListener("change", ev => {
+  const f = ev.target.files[0];
+  if (f) setUserAudio(f, `uploaded ${f.name} (${(f.size/1024).toFixed(0)} KB)`);
+});
+function setUserAudio(blob, info) {
+  userBlob = blob;
+  document.getElementById("user-audio").src = URL.createObjectURL(blob);
+  document.getElementById("user-info").textContent = info;
+}
+function encodeWav(samples, sampleRate) {
+  const buf = new ArrayBuffer(44 + samples.length * 2);
+  const v = new DataView(buf);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0,"RIFF"); v.setUint32(4,36+samples.length*2,true); ws(8,"WAVE");
+  ws(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sampleRate,true); v.setUint32(28,sampleRate*2,true);
+  v.setUint16(32,2,true); v.setUint16(34,16,true);
+  ws(36,"data"); v.setUint32(40,samples.length*2,true);
+  let off = 44;
+  for (let i = 0; i < samples.length; i++) { const s = Math.max(-1,Math.min(1,samples[i])); v.setInt16(off, s<0?s*0x8000:s*0x7fff,true); off+=2; }
+  return new Blob([v], { type: "audio/wav" });
+}
+
+/* ---------- evaluation ---------- */
+function requireAudio() { if (!userBlob) { alert("Record or upload first."); return false; } return true; }
+async function runEvaluate() {
+  if (!requireAudio()) return;
+  const refId = document.getElementById("ref-select").value;
+  if (!refId) { alert("Choose a reference first."); return; }
+  const fd = new FormData();
+  fd.append("audio", userBlob, "attempt.wav");
+  fd.append("reference_id", refId);
+  fd.append("weight_pronunciation", document.getElementById("w-pron").value);
+  fd.append("weight_intonation", document.getElementById("w-into").value);
+  fd.append("weight_fluency", document.getElementById("w-flu").value);
+  fd.append("dtw_scale", document.getElementById("w-dtw").value);
+  fd.append("feedback_language", LANG);
+  await runEval(() => jpost(`${API}/evaluate`, fd));
+}
+async function runEval(fn) {
+  const st = document.getElementById("eval-status");
+  const btn = document.getElementById("eval-btn");
+  btn.disabled = true; setStatus(st, "Evaluating (first call loads models)…");
+  try {
+    const res = await fn();
+    renderResults(res);
+    setStatus(st, `Done — ${res.id}`);
+    loadHistory(); refreshHealth();
+  } catch (e) { setStatus(st, e.message, true); }
+  btn.disabled = false;
+}
+
+/* ---------- results ---------- */
+function renderResults(res) {
+  document.getElementById("results-empty").classList.add("hidden");
+  document.getElementById("results-content").classList.remove("hidden");
+  const s = res.scores;
+  const card = (label, block) => `<div class="bg-panel2 border border-border rounded-lg p-3">
+    <div class="text-muted text-[11px] uppercase tracking-wide">${label}</div>
+    <div class="text-2xl font-bold ${gradeClass(block.grade)}">${block.score}<span class="text-muted text-sm">/100</span></div>
+    <div class="text-xs ${gradeClass(block.grade)}">${gradeLabel(block.grade)}</div></div>`;
+  document.getElementById("score-cards").innerHTML =
+    card(t("card_pron"), s.pronunciation) + card(t("card_into"), s.intonation) +
+    card(t("card_flu"), s.fluency) + card(t("card_comp"), s.composite);
+
+  const errsToStr = (errs) => errs.map(e =>
+    e.type === "sub" ? `/${e.expected}/ → /${e.actual}/`
+    : e.type === "del" ? `missing /${e.expected}/`
+    : `extra /${e.actual}/`).join("; ");
+  document.getElementById("word-diff").innerHTML = (res.words && res.words.length)
+    ? res.words.map(w => `<span class="ph ${w.status === "match" ? "match" : w.status}" title="${errsToStr(w.errors) || "ok"}">${w.word}</span>`).join(" ")
+    : `<span class="text-muted text-sm">(needs reference text)</span>`;
+
+  document.getElementById("phoneme-diff").innerHTML = res.phoneme_diff.map(op => {
+    if (op.type === "match") return `<span class="ph match">/${op.phoneme}/</span>`;
+    if (op.type === "sub")   return `<span class="ph sub" title="expected /${op.expected}/">/${op.actual}/</span>`;
+    if (op.type === "del")   return `<span class="ph del" title="deleted">/${op.expected}/</span>`;
+    return `<span class="ph ins" title="inserted">/${op.actual}/</span>`;
+  }).join(" ") || `<span class="text-muted text-sm">(empty)</span>`;
+
+  document.getElementById("feedback").innerHTML = res.feedback.map(f => `<li class="my-0.5">• ${f}</li>`).join("") || `<li class="text-muted">none</li>`;
+}
+
+/* ---------- history ---------- */
+async function loadHistory() {
+  try {
+    const h = await jget(`${API}/history?limit=100`);
+    const el = document.getElementById("history-list");
+    if (!h.items.length) { el.innerHTML = `<div class="text-muted text-xs">${t("no_history")}</div>`; return; }
+    el.innerHTML = h.items.map(it =>
+      `<div class="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-panel2" onclick="viewHistory('${it.id}')">
+         <span class="font-mono text-xs">${it.id}</span>
+         <span class="${gradeClass(it.composite_grade)}">${it.composite_score}/100 ${gradeLabel(it.composite_grade)}</span>
+         <span class="text-muted text-xs">${it.created_at}</span>
+         <button class="ml-auto bg-bad text-bg rounded-md px-2 py-1 text-xs font-semibold border-0 cursor-pointer" onclick="event.stopPropagation();deleteHistory('${it.id}')">${t("del")}</button>
+       </div>`).join("");
+  } catch (e) { console.error(e); }
+}
+async function deleteHistory(id) {
+  if (!confirm(`Delete ${id}?`)) return;
+  try { const r = await fetch(`${API}/history/${id}`, { method: "DELETE" }); if (!r.ok && r.status !== 204) throw new Error(r.status); loadHistory(); }
+  catch (e) { alert("Delete failed: " + e.message); }
+}
+async function viewHistory(id) {
+  try {
+    const data = await jget(`${API}/history/${id}`);
+    renderResults({ id: data.id, scores: { ...data.scores, composite: data.composite }, phoneme_diff: data.phoneme_diff || [], words: data.words || [], feedback: data.feedback || [] });
+    const rid = data.reference_id;
+    if (rid) { const sel = document.getElementById("ref-select"); if ([...sel.options].some(o => o.value === rid)) sel.value = rid; setAudio("ref-audio", `${API}/references/${rid}/audio`, "ref(history)"); }
+    if (data.audio_url) {
+      setAudio("user-audio", data.audio_url, "attempt(history)");
+      try { const resp = await fetch(data.audio_url); userBlob = await resp.blob(); document.getElementById("user-info").textContent = "loaded — ready to re-evaluate"; } catch {}
+    }
+  } catch (e) { alert(e.message); }
+}
+
+/* ---------- i18n ---------- */
+const I18N = {
+  en: { subtitle:"local-first speech evaluation", existing:"— existing references —",
+    gen:"Generate", refresh:"Refresh", record:"Record", evaluate:"Evaluate",
+    advanced:"Advanced settings", no_history:"No evaluations yet.", del:"Delete", rec_or:"or",
+    card_pron:"Pronunciation", card_into:"Intonation", card_flu:"Fluency", card_comp:"Composite",
+    grades:{good:"Good",fair:"Fair",needs_work:"Needs Work"},
+    s1:"1 · Reference", s2:"2 · Your attempt", s3:"3 · Evaluate", s4:"4 · Results", s5:"5 · History",
+    ref_ph:"Type a sentence to synthesize…",
+  },
+  vi: { subtitle:"đánh giá phát âm cục bộ", existing:"— bản dịch có sẵn —",
+    gen:"Tạo", refresh:"Làm mới", record:"Ghi âm", evaluate:"Đánh giá",
+    advanced:"Cài đặt nâng cao", no_history:"Chưa có đánh giá nào.", del:"Xoá", rec_or:"hoặc",
+    card_pron:"Phát âm", card_into:"Ngữ điệu", card_flu:"Nhịp điệu", card_comp:"Tổng hợp",
+    grades:{good:"Tốt",fair:"Tạm được",needs_work:"Cần cải thiện"},
+    s1:"1 · Bản dịch chuẩn", s2:"2 · Bản ghi âm", s3:"3 · Đánh giá", s4:"4 · Kết quả", s5:"5 · Lịch sử",
+    ref_ph:"Nhập câu cần tổng hợp…",
+  },
+};
+let LANG = localStorage.getItem("lang") || "en";
+function t(k) { return (I18N[LANG] || I18N.en)[k] ?? k; }
+function gradeLabel(g) { return (I18N[LANG]?.grades || {})[g] || g; }
+function applyI18n() {
+  const m = I18N[LANG] || I18N.en;
+  document.getElementById("hdr-sub").innerHTML = `${m.subtitle} · <a class="text-muted" href="/docs" target="_blank">API docs</a>`;
+  document.getElementById("title-ref").textContent = m.s1;
+  document.getElementById("title-att").textContent = m.s2;
+  document.getElementById("title-eval").textContent = m.s3;
+  document.getElementById("title-res").textContent = m.s4;
+  document.getElementById("title-hist").textContent = m.s5;
+  document.getElementById("ref-text").placeholder = m.ref_ph;
+  document.getElementById("btn-gen").textContent = m.gen;
+  document.getElementById("btn-refresh").textContent = m.refresh;
+  const rb = document.getElementById("rec-btn"); if (rb.textContent !== "Stop") rb.textContent = m.record;
+  document.getElementById("rec-status").textContent = m.rec_or;
+  document.getElementById("eval-btn").textContent = m.evaluate;
+  document.getElementById("summary-adv").textContent = m.advanced;
+  loadHistory();
+}
+function changeLang() { LANG = document.getElementById("ui-lang").value; localStorage.setItem("lang", LANG); applyI18n(); }
+
+/* ---------- init ---------- */
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+document.getElementById("ui-lang").value = LANG;
+applyI18n();
+refreshHealth(); loadReferences(); loadHistory();
+</script>
+</body>
+</html>
