@@ -69,7 +69,7 @@
         </select>
       </div>
       <div class="flex gap-2 items-center mt-2">
-        <select id="voice-lang" onchange="updateVoices()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs">
+        <select id="voice-lang" onchange="updateVoices();saveSettings()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs">
           <option value="en">English (US)</option>
           <option value="en-gb">English (UK)</option>
           <option value="es">Español</option>
@@ -77,7 +77,7 @@
           <option value="ja">Japanese</option>
           <option value="zh">Chinese</option>
         </select>
-        <select id="voice-name" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs"></select>
+        <select id="voice-name" onchange="saveSettings()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs"></select>
       </div>
       <div id="ref-text-display" class="text-sm text-text mt-2 mb-1 italic"></div>
       <audio id="ref-audio" controls class="w-full mt-2"></audio>
@@ -106,13 +106,13 @@
         <summary class="text-muted text-xs cursor-pointer" id="summary-adv">Advanced settings</summary>
         <div class="flex gap-2 flex-wrap items-center mt-2">
           <label class="text-xs text-muted">Pron.</label>
-          <input type="number" id="w-pron" value="0.4" min="0" max="1" step="0.05" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
+          <input type="number" id="w-pron" value="0.4" onchange="saveSettings()" min="0" max="1" step="0.05" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
           <label class="text-xs text-muted">Inton.</label>
-          <input type="number" id="w-into" value="0.3" min="0" max="1" step="0.05" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
+          <input type="number" id="w-into" value="0.3" onchange="saveSettings()" min="0" max="1" step="0.05" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
           <label class="text-xs text-muted">Fluency</label>
-          <input type="number" id="w-flu" value="0.3" min="0" max="1" step="0.05" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
+          <input type="number" id="w-flu" value="0.3" onchange="saveSettings()" min="0" max="1" step="0.05" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
           <label class="text-xs text-muted" id="lbl-dtw">DTW scale</label>
-          <input type="number" id="w-dtw" value="1.0" min="0.1" max="10" step="0.1" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
+          <input type="number" id="w-dtw" value="1.0" onchange="saveSettings()" min="0.1" max="10" step="0.1" class="w-14 bg-panel2 border border-border text-text rounded-md px-2 py-1 text-sm" />
         </div>
         <div class="text-muted text-xs mt-1" id="lbl-wnote">Weights normalise automatically (sum to 1.0).</div>
       </details>
@@ -194,7 +194,31 @@ function updateVoices() {
   document.getElementById("voice-name").innerHTML =
     list.map(v => `<option value="${v}">${v}</option>`).join("");
 }
-updateVoices();
+
+/* ---------- settings persistence ---------- */
+const SETTINGS_KEY = "ai-ss-settings";
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+    vl: document.getElementById("voice-lang").value,
+    vn: document.getElementById("voice-name").value,
+    wp: document.getElementById("w-pron").value,
+    wi: document.getElementById("w-into").value,
+    wf: document.getElementById("w-flu").value,
+    wd: document.getElementById("w-dtw").value,
+  }));
+}
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    if (s.vl) document.getElementById("voice-lang").value = s.vl;
+    updateVoices();
+    if (s.vn) document.getElementById("voice-name").value = s.vn;
+    if (s.wp) document.getElementById("w-pron").value = s.wp;
+    if (s.wi) document.getElementById("w-into").value = s.wi;
+    if (s.wf) document.getElementById("w-flu").value = s.wf;
+    if (s.wd) document.getElementById("w-dtw").value = s.wd;
+  } catch { updateVoices(); }
+}
 function seekAudio(elId, ratio) {
   // Seek BOTH audio players to ~1s before the proportional position so the
   // whole word/sound is heard in context, not just its first frame.
@@ -464,6 +488,7 @@ function changeLang() { LANG = document.getElementById("ui-lang").value; localSt
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 document.getElementById("ui-lang").value = LANG;
 applyI18n();
+loadSettings();
 refreshHealth(); loadReferences(); loadHistory();
 </script>
 </body>
