@@ -1,0 +1,39 @@
+# Default practice sentences for ai-speech-shadowing
+# 30 sentences: warm-up + workplace + small talk
+# Regenerate: ai-speech-shadowing generate-reference --list data/default.txt
+
+# --- Warm-up (4) ---
+Hello world
+The quick brown fox jumps over the lazy dog.
+How are you doing today?
+Speech shadowing helps you sound like a native speaker.
+
+# --- Workplace essentials (20) ---
+Hi, I am a software engineer and I recently joined the team.
+Could you please send me the meeting agenda?
+Let's schedule a quick call to discuss this.
+I think we should prioritize the most critical issues first.
+Can you walk me through your approach?
+I'd like to follow up on the action items from our last meeting.
+Could you clarify what you mean by that?
+Let me share my screen so everyone can see.
+I agree with your point, but I have a small concern.
+We need to push the deadline back by two days.
+Could you review my pull request when you have a moment?
+I am going to be out of the office tomorrow.
+Let us circle back to this after we gather more data.
+That sounds like a great idea. How can I help?
+I am not sure I understand. Could you explain it again?
+The deployment failed, but I have already rolled it back.
+Thank you for your hard work on this project.
+Can we move this meeting to next Wednesday?
+I will send out a summary by the end of the day.
+Does anyone have any questions before we wrap up?
+
+# --- Small talk (6) ---
+How was your weekend? Did you do anything fun?
+The weather has been really nice lately, hasn't it?
+I am running a few minutes late, please start without me.
+Would you like to grab coffee after the meeting?
+I heard you got a promotion. Congratulations!
+Let's keep in touch after the project ends.

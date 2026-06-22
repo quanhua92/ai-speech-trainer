@@ -1,0 +1,13 @@
+{
+  "text": "I'd like to follow up on the action items from our last meeting.",
+  "language": "en-us",
+  "default_speaker": "af_heart",
+  "updated_at": "2026-06-22T16:56:08+00:00",
+  "audio": {
+    "kokoro-en-us": {
+      "file": "audio/kokoro-en-us/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "text": "The deployment failed, but I have already rolled it back.",
+  "language": "en-us",
+  "default_speaker": "af_heart",
+  "updated_at": "2026-06-22T16:56:33+00:00",
+  "audio": {
+    "kokoro-en-us": {
+      "file": "audio/kokoro-en-us/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    }
+  }
+}

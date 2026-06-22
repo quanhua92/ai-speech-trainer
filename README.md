@@ -14,6 +14,19 @@ uv sync                                # create .venv and install deps
 uv run python scripts/explore_kokoro.py --text "Hello world"
 ```
 
+## Practice sentences
+
+The repo ships with **26 pre-generated Kokoro references** (`data/references/`)
+covering common workplace English — meetings, deadlines, code review, small
+talk, and more. See [`data/workplace-20.txt`](data/workplace-20.txt) for the
+full list. Pick one in the demo, record your attempt, and get instant feedback.
+
+To regenerate or add your own:
+
+```bash
+uv run ai-speech-shadowing generate-reference --list data/workplace-20.txt
+```
+
 ## Development
 
 After cloning, install dependencies and activate the project-local Git hooks:

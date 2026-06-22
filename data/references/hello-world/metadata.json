@@ -2,7 +2,7 @@
   "text": "Hello world",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T13:15:38+00:00",
+  "updated_at": "2026-06-22T16:55:45+00:00",
   "audio": {
     "kokoro-en-us": {
       "file": "audio/kokoro-en-us/ref.wav",
