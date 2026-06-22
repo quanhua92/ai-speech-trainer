@@ -239,16 +239,17 @@ Because a user might speak slower or faster than the native reference without ne
 
 ---
 
-### Phase 3 — Pitch & Prosody Analysis
+### Phase 3 — Pitch & Prosody Analysis ✅
 
 > **Goal:** Detect monotone delivery and compare intonation curves.
+> **Done** — see [`pitch-prosody.md`](pitch-prosody.md) for the full API reference. (Pitch contour visualization is deferred to the Phase 8 web UI.)
 
-- [ ] Integrate `praat-parselmouth` for F0 extraction
-- [ ] Compute pitch statistics: mean, median, max, min, range, std-dev
-- [ ] Build reference vs. user pitch range comparison
-- [ ] Implement monotone detection threshold (configurable %)
-- [ ] Optionally: generate pitch contour visualization (matplotlib / plotly)
-- [ ] Add prosody sub-score to the feedback report
+- [x] Integrate `praat-parselmouth` for F0 extraction
+- [x] Compute pitch statistics: mean, median, max, min, range, std-dev
+- [x] Build reference vs. user pitch range comparison
+- [x] Implement monotone detection threshold (configurable %)
+- [ ] Optionally: generate pitch contour visualization (matplotlib / plotly)  → deferred to Phase 8 web UI
+- [x] Add prosody sub-score to the feedback report
 
 **Key Metric:** `Pitch Range Ratio` — user pitch range / reference pitch range.
 

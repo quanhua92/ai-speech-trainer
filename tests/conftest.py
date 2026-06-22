@@ -12,6 +12,8 @@ import numpy as np
 import pytest
 import soundfile as sf
 
+from ai_speech_shadowing.core.audio import AudioSample
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
@@ -87,6 +89,43 @@ def quiet_wav(tmp_path: Path) -> Path:
 def silent_wav(tmp_path: Path) -> Path:
     """A 0.5s mono pure-silence clip."""
     return _write(tmp_path / "silent.wav", np.zeros(8000, dtype=np.float32), 16000)
+
+
+# ---- In-memory AudioSample fixtures for prosody (deterministic DSP) ----
+def _tone(seconds: float, freq: float, sr: int = 16000, amp: float = 0.5) -> np.ndarray:
+    t = np.arange(int(seconds * sr)) / sr
+    return (amp * np.sin(2 * np.pi * freq * t)).astype(np.float32)
+
+
+@pytest.fixture
+def pitched_200_sample() -> AudioSample:
+    """A clean 200 Hz mono tone (parselmouth should report ~200 Hz)."""
+    return AudioSample(waveform=_tone(1.0, 200.0), sample_rate=16000)
+
+
+@pytest.fixture
+def wide_range_sample() -> AudioSample:
+    """A 100 Hz + 300 Hz concatenation → pitch range ≈ 200 Hz."""
+    return AudioSample(
+        waveform=np.concatenate([_tone(1.0, 100.0), _tone(1.0, 300.0)]),
+        sample_rate=16000,
+    )
+
+
+@pytest.fixture
+def narrow_sample() -> AudioSample:
+    """A pure 150 Hz tone → tiny pitch range (monotone-ish)."""
+    return AudioSample(waveform=_tone(2.0, 150.0), sample_rate=16000)
+
+
+@pytest.fixture
+def noise_sample() -> AudioSample:
+    """White noise (seeded) → unvoiced, no detectable F0."""
+    rng = np.random.default_rng(42)
+    return AudioSample(
+        waveform=(0.3 * rng.standard_normal(16000)).astype(np.float32),
+        sample_rate=16000,
+    )
 
 
 @pytest.fixture(scope="session")
