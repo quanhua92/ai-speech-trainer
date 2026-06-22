@@ -23,7 +23,18 @@ uv sync                               # install runtime + dev deps into .venv
 git config core.hooksPath githooks    # use the project's hooks (ruff on commit)
 ```
 
-Common tasks:
+Common tasks (see [`Justfile`](Justfile), run `just` to list):
+
+```bash
+just sync        # uv sync — install runtime + dev deps
+just lint        # ruff check
+just format      # ruff format
+just test        # pytest
+just verify      # lint + format-check + test (CI gate)
+just explore "Hello world"   # run the Kokoro TTS explorer
+```
+
+Equivalent raw commands:
 
 ```bash
 uv run ruff check .                   # lint
