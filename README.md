@@ -17,8 +17,15 @@ For the full architecture, roadmap, and API specification, see [`docs/README.md`
 ```bash
 brew install espeak-ng                 # kokoro English fallback dependency
 uv sync                                # create .venv and install deps
-uv run python scripts/explore_kokoro.py --text "Hello world"
+uv run ai-speech-shadowing serve       # API + demo on http://localhost:8000
+# or: bash scripts/serve.sh            # HTTPS (needed for mic on non-localhost)
 ```
+
+Then open **http://localhost:8000/** — pick a reference, record your attempt,
+and get instant feedback. (First evaluation loads the models, ~10s.)
+
+For LAN/mobile access, use `bash scripts/serve.sh` — it auto-generates a
+self-signed TLS cert so the microphone works from other devices.
 
 ## Practice sentences
 
