@@ -62,7 +62,6 @@
       <div class="flex gap-2 flex-wrap items-start">
         <textarea id="ref-text" placeholder="Type a sentence to synthesize…" rows="2" class="flex-1 min-w-[200px] bg-panel2 border border-border text-text rounded-md px-2.5 py-2 text-sm resize-vertical" style="font-family:inherit"></textarea>
         <button onclick="createReference()" id="btn-gen" class="bg-accent text-bg border-0 rounded-md px-3.5 py-2 text-sm font-semibold cursor-pointer">Generate</button>
-        <button class="bg-panel2 text-text border border-border rounded-md px-3.5 py-2 text-sm" onclick="loadReferences()" id="btn-refresh">Refresh</button>
       </div>
       <div class="mt-2.5">
         <select id="ref-select" onchange="playSelectedReference()" class="w-full bg-panel2 border border-border text-text rounded-md px-2.5 py-2 text-sm">
@@ -397,7 +396,6 @@ function applyI18n() {
   document.getElementById("title-hist").textContent = m.s5;
   document.getElementById("ref-text").placeholder = m.ref_ph;
   document.getElementById("btn-gen").textContent = m.gen;
-  document.getElementById("btn-refresh").textContent = m.refresh;
   const rb = document.getElementById("rec-btn"); if (rb.textContent !== "Stop") rb.textContent = m.record;
   document.getElementById("rec-status").textContent = m.rec_or;
   document.getElementById("eval-btn").textContent = m.evaluate;
