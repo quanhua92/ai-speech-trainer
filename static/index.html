@@ -259,7 +259,8 @@ async function loadReferences() {
       const ref = refs.find(r => r.id === id);
       document.getElementById("ref-select").value = id;
       document.getElementById("ref-text-display").textContent = ref ? ref.text : "";
-      setAudio("ref-audio", `${API}/references/${id}/audio`, "reference(load)");
+      const voice = document.getElementById("voice-name").value;
+      setAudio("ref-audio", `${API}/references/${id}/audio?voice=${encodeURIComponent(voice)}`, "reference(load)");
     }
   } catch (e) { console.error(e); }
 }
@@ -281,9 +282,9 @@ async function createReference() {
 function playSelectedReference() {
   const id = document.getElementById("ref-select").value;
   if (!id) return;
-  setAudio("ref-audio", `${API}/references/${id}/audio`, "reference(select)");
+  const voice = document.getElementById("voice-name").value;
+  setAudio("ref-audio", `${API}/references/${id}/audio?voice=${encodeURIComponent(voice)}`, "reference(select)");
   document.getElementById("ref-audio").play().catch(() => {});
-  // show the full text below the dropdown
   const sel = document.getElementById("ref-select");
   const opt = [...sel.options].find(o => o.value === id);
   if (opt) document.getElementById("ref-text-display").textContent = opt.dataset.text || "";

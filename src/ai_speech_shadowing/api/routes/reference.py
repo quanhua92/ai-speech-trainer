@@ -90,14 +90,31 @@ def delete_reference(slug: str) -> None:
 
 
 @router.get("/{slug}/audio")
-def get_reference_audio(slug: str) -> FileResponse:
+def get_reference_audio(slug: str, voice: str | None = None) -> FileResponse:
+    """Stream the reference WAV. If ``voice`` is given and no audio exists for
+    that voice yet, auto-generate it on the fly (~2s first time, cached)."""
     state = get_state()
-    profile = state.reference_manager._profile_for_slug(slug)
-    audio_file = state.reference_manager.audio_file(slug, profile)
+    mgr = state.reference_manager
+
+    if voice and voice != "default":
+        profile = mgr.voice_profile(voice=voice)
+        audio_file = mgr.audio_file(slug, profile)
+        if not audio_file.is_file():
+            # auto-generate with the requested voice
+            meta = mgr.read_metadata(slug)
+            text = str(meta.get("text", ""))
+            if text:
+                lang_code = voice[0]  # Kokoro convention: first letter = lang
+                mgr.generate(text, voice=voice, lang=lang_code)
+                state.mark_tts_loaded(load_time_ms=0)
+    else:
+        profile = mgr._profile_for_slug(slug)
+        audio_file = mgr.audio_file(slug, profile)
+
     if not audio_file.is_file():
         raise HTTPException(status_code=404, detail=f"no audio for reference {slug!r}")
     return FileResponse(
         path=str(audio_file),
         media_type="audio/wav",
-        content_disposition_type="inline",  # play in <audio>, don't download
+        content_disposition_type="inline",
     )
