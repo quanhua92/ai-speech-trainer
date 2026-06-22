@@ -255,16 +255,17 @@ Because a user might speak slower or faster than the native reference without ne
 
 ---
 
-### Phase 4 — Fluency & Timing (DTW)
+### Phase 4 — Fluency & Timing (DTW) ✅
 
 > **Goal:** Evaluate pacing, rhythm, and temporal alignment.
+> **Done** — see [`fluency-timing.md`](fluency-timing.md) for the full API reference.
 
-- [ ] Extract MFCC feature matrices from both audio signals
-- [ ] Implement DTW alignment via `fastdtw` + Euclidean distance
-- [ ] Compute normalized DTW distance score
-- [ ] Detect abnormal pauses (silence gaps > threshold within speech)
-- [ ] Calculate syllable rate (syllables per second approximation)
-- [ ] Add timing sub-score to the feedback report
+- [x] Extract MFCC feature matrices from both audio signals
+- [x] Implement DTW alignment via `fastdtw` + Euclidean distance
+- [x] Compute normalized DTW distance score
+- [x] Detect abnormal pauses (silence gaps > threshold within speech)
+- [x] Calculate syllable rate (syllables per second approximation)
+- [x] Add timing sub-score to the feedback report
 
 **Key Metric:** `DTW Distance` (normalized) — lower means closer rhythm match.
 

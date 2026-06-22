@@ -8,6 +8,7 @@ from typing import Annotated
 import typer
 
 from ai_speech_shadowing.core.audio import TARGET_SAMPLE_RATE, AudioSample
+from ai_speech_shadowing.core.fluency import compare_fluency
 from ai_speech_shadowing.core.phoneme import get_extractor
 from ai_speech_shadowing.core.preprocess import preprocess
 from ai_speech_shadowing.core.prosody import (
@@ -156,3 +157,55 @@ def prosody_cmd(
         f"min {stats.min_hz:.1f} Hz | max {stats.max_hz:.1f} Hz | range {stats.range_hz:.1f} Hz"
     )
     typer.echo(f"std {stats.std_hz:.1f} Hz | voiced {stats.voiced_ratio * 100:.1f}%")
+
+
+@app.command("fluency")
+def fluency_cmd(
+    reference: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="Reference (native) audio file.",
+        ),
+    ],
+    hypothesis: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="User (hypothesis) audio file to compare against the reference.",
+        ),
+    ],
+    min_pause: Annotated[
+        float,
+        typer.Option("--min-pause", help="Minimum interior pause length (s) to flag."),
+    ] = 0.25,
+    no_preprocess: Annotated[
+        bool,
+        typer.Option("--no-preprocess", help="Skip preprocessing of both files."),
+    ] = False,
+) -> None:
+    """Compare fluency/timing of a user recording vs. a reference (MFCC + DTW)."""
+    prep = (lambda s: s) if no_preprocess else preprocess
+    ref = prep(AudioSample.from_wav(reference))
+    hyp = prep(AudioSample.from_wav(hypothesis))
+    diff = compare_fluency(ref, hyp, min_pause_s=min_pause)
+
+    typer.echo(
+        f"DTW distance {diff.dtw.distance:.2f} | "
+        f"normalized {diff.dtw.normalized_distance:.3f} (path {diff.dtw.path_length})"
+    )
+    typer.echo(f"score {diff.score * 100:.0f}/100 ({diff.grade})")
+    typer.echo(
+        f"pauses: ref {diff.reference_pauses.count} "
+        f"({diff.reference_pauses.total_seconds:.2f}s) | "
+        f"hyp {diff.hypothesis_pauses.count} "
+        f"({diff.hypothesis_pauses.total_seconds:.2f}s)"
+    )
+    typer.echo(
+        f"syllable rate: ref {diff.syllable_rate_reference:.2f}/s | "
+        f"hyp {diff.syllable_rate_hypothesis:.2f}/s"
+    )

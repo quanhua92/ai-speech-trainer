@@ -128,6 +128,28 @@ def noise_sample() -> AudioSample:
     )
 
 
+@pytest.fixture
+def gapped_sample() -> AudioSample:
+    """A 200Hz tone, 0.5s silence, 200Hz tone → one interior pause ≥ 0.25s."""
+    sr = 16000
+    tone = _tone(0.5, 200.0, sr=sr)
+    silence = np.zeros(int(0.5 * sr), dtype=np.float32)
+    return AudioSample(waveform=np.concatenate([tone, silence, tone]), sample_rate=sr)
+
+
+@pytest.fixture
+def pulse_train_sample() -> AudioSample:
+    """Five 200Hz bursts separated by silence → ~5 energy/syllable peaks."""
+    sr = 16000
+    burst = _tone(0.12, 200.0, sr=sr)
+    gap = np.zeros(int(0.10 * sr), dtype=np.float32)
+    parts = []
+    for _ in range(5):
+        parts.append(burst)
+        parts.append(gap)
+    return AudioSample(waveform=np.concatenate(parts), sample_rate=sr)
+
+
 @pytest.fixture(scope="session")
 def kokoro_ref_wav(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """A Kokoro-generated native reference (24kHz) for slow model tests.
