@@ -2,7 +2,7 @@
 
 An open-source, localized speech evaluation engine that pairs native-speaker text-to-speech (TTS) reference files against recorded user audio to deliver immediate, multi-dimensional feedback on **Pronunciation Accuracy, Fluency, and Intonation**.
 
-> **Status:** 🚧 Pre-Alpha — Architecture design & foundation phase.
+> **Status:** 🧪 Alpha — Core engine, CLI, REST API & demo UI complete (Phases 0–8). Optimization & full web UI pending (Phases 9–10).
 
 ---
 
@@ -190,17 +190,18 @@ Because a user might speak slower or faster than the native reference without ne
 
 ---
 
-### Phase 0 — Project Scaffolding & Environment `[Current]`
+### Phase 0 — Project Scaffolding & Environment ✅
 
 > **Goal:** Establish a clean, reproducible development foundation.
+> **Done** — `pyproject.toml` (uv), ruff config, `Justfile`, `githooks/`, `tests/`, and `docs/` are all in place.
 
-- [ ] Initialize Python project with `pyproject.toml` (or `setup.cfg`)
-- [ ] Set up dependency management (`uv` / `pip-tools` / `poetry`)
-- [ ] Create virtual environment & pin Python version
-- [ ] Add `.gitignore`, `LICENSE`, linting config (`ruff` / `black`)
-- [ ] Set up basic `Makefile` or `justfile` for common tasks
-- [ ] Create initial `docs/` structure (this file ✅)
-- [ ] Set up `tests/` directory with pytest scaffolding
+- [x] Initialize Python project with `pyproject.toml` (or `setup.cfg`)
+- [x] Set up dependency management (`uv` / `pip-tools` / `poetry`)
+- [x] Create virtual environment & pin Python version
+- [x] Add `.gitignore`, `LICENSE`, linting config (`ruff` / `black`)
+- [x] Set up basic `Makefile` or `justfile` for common tasks
+- [x] Create initial `docs/` structure (this file ✅)
+- [x] Set up `tests/` directory with pytest scaffolding
 
 **Deliverable:** A runnable, empty project skeleton with CI-ready structure.
 
@@ -355,7 +356,7 @@ graph TD
 
 ---
 
-### Phase 8 — REST API & Web UI
+### Phase 8 — REST API & Web UI ✅
 
 > **Goal:** Expose the engine via HTTP and build a modern web interface.
 
