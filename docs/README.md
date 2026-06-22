@@ -374,22 +374,21 @@ This phase is split into two parallel tracks:
 - [x] Add OpenAPI docs auto-generation (`/docs`, `/redoc`)
 - [x] Write API integration tests with `httpx` / `TestClient`  *(+ `scripts/test_e2e.py` over real HTTP)*
 
-#### 8B — TanStack Start Frontend (`web/`) ⏸ Deferred
+#### 8B — Single-page Demo (`GET /demo`) ✅
 
-> Deferred to a later phase. The 8A API above is the complete, stable contract any frontend (or third-party client) can build against.
+> **Done** — a self-contained `demo.html` served by the API at `GET /demo`
+> (no build step, vanilla JS). Showcases **every** feature: mic record-to-WAV,
+> file upload, reference generation + playback, full + quick evaluation,
+> colour-coded phoneme diff, score cards, feedback, and history. The full
+> TanStack Start SPA was deferred to [Phase 10](#phase-10--full-web-ui-tanstack-start-).
 
-- [ ] Initialize TanStack Start (React + Vinxi) project in `web/` directory
-- [ ] Features:
-  - Microphone recording with Web Audio API
-  - Text input → TTS reference generation via API
-  - Upload or record → instant evaluation feedback
-  - Side-by-side waveform / pitch contour visualization
-  - Color-coded phoneme diff display
-  - Evaluation history with trend graphs & progress tracking
-- [ ] Implement TanStack Router for page navigation
-- [ ] Use TanStack Query for API data fetching & caching
-- [ ] Add responsive design (mobile-friendly for phone practice)
-- [ ] Optional: containerize full stack with Docker Compose
+- [x] Serve a single hardcoded `demo.html` from the FastAPI app
+- [x] Microphone recording (Web Audio API → in-browser WAV encode) + `.wav` upload
+- [x] Text → TTS reference generation; list + play existing references
+- [x] Evaluate (pre-generated reference) + quick-evaluate (text) → instant feedback
+- [x] Colour-coded phoneme diff, score cards, feedback list
+- [x] Browse past evaluations from history
+- [x] Health / model-load status indicator
 
 ---
 
@@ -405,6 +404,14 @@ This phase is split into two parallel tracks:
 - [ ] Write comprehensive documentation (API docs, usage guides)
 - [ ] Set up CI/CD pipeline (GitHub Actions)
 - [ ] Add pre-commit hooks (ruff, mypy, pytest)
+
+---
+
+### Phase 10 — Full Web UI (TanStack Start)
+
+> **Goal:** The production-grade React SPA (`web/`) for daily practice. Deferred from the
+> original Phase 8B; the lightweight `/demo` HTML already showcases every feature.
+> Details in `tmp/phase_10_web_ui.md`.
 
 ---
 

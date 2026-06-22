@@ -26,6 +26,22 @@ uvicorn.run(create_app(), host="127.0.0.1", port=8000)
 
 CORS is enabled for `localhost:3000` / `localhost:5173` (frontend dev servers).
 
+## Interactive demo
+
+A single-page, dependency-free demo is served at **`GET /demo`** (not under
+`/api/v1` — it's a page, not an API resource). It showcases every feature with
+vanilla JS: mic **record-to-WAV** (Web Audio API + in-browser PCM encode) or
+`.wav` upload, **reference** generation + list/playback, **full and quick
+evaluation**, **colour-coded phoneme diff**, score cards, feedback, and
+**history** browsing — all against the live `/api/v1/*` endpoints.
+
+```bash
+ai-speech-shadowing serve   # then open http://127.0.0.1:8000/demo
+```
+
+Source: [`src/ai_speech_shadowing/api/demo.html`](../src/ai_speech_shadowing/api/demo.html).
+The full TanStack Start SPA is deferred to Phase 10.
+
 ## Endpoints
 
 | Method | Endpoint | Purpose |

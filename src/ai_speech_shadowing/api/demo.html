@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ai-speech-shadowing · demo</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1f2430; --border: #2a3140;
+    --text: #e6e9ef; --muted: #9aa4b2; --accent: #6ea8fe; --good: #4ade80;
+    --fair: #facc15; --bad: #f87171; --ins: #38bdf8; --del: #fb923c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .badges { margin-left: auto; display: flex; gap: 8px; }
+  .badge {
+    font-size: 11px; padding: 3px 8px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted); background: var(--panel);
+  }
+  .badge.on { color: var(--good); border-color: var(--good); }
+  main { max-width: 1000px; margin: 0 auto; padding: 20px; display: grid; gap: 16px; }
+  section {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+  }
+  section h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  input[type=text], select {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 8px 10px; font-size: 13px; flex: 1; min-width: 180px;
+  }
+  button {
+    background: var(--accent); color: #0b0d12; border: 0; border-radius: 6px;
+    padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: var(--bad); color: #1a0606; }
+  audio { width: 100%; margin-top: 8px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .card .score { font-size: 26px; font-weight: 700; }
+  .card .grade { font-size: 12px; }
+  .g-good { color: var(--good); } .g-fair { color: var(--fair); } .g-needs_work { color: var(--bad); }
+  .diff { font-family: ui-monospace, "SF Mono", Menlo, monospace; line-height: 1.9; font-size: 15px; }
+  .ph { display: inline-block; padding: 1px 6px; margin: 1px; border-radius: 4px; border: 1px solid transparent; }
+  .ph.match { color: var(--muted); }
+  .ph.sub { color: var(--bad); border-color: var(--bad); }
+  .ph.del { color: var(--del); border-color: var(--del); text-decoration: line-through; }
+  .ph.ins { color: var(--ins); border-color: var(--ins); }
+  ul.feedback { margin: 6px 0 0; padding-left: 18px; }
+  ul.feedback li { margin: 3px 0; }
+  .hist { cursor: pointer; padding: 8px 10px; border-radius: 6px; }
+  .hist:hover { background: var(--panel-2); }
+  .hist .id { font-family: ui-monospace, monospace; font-size: 12px; }
+  .err { color: var(--bad); }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--muted); border-top-color: transparent; border-radius: 50%; animation: sp .7s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>ai-speech-shadowing</h1>
+    <div class="sub">local-first speech evaluation · <a class="sub" href="/docs" target="_blank">API docs</a></div>
+  </div>
+  <div class="badges">
+    <span class="badge" id="b-wav2vec2">wav2vec2: …</span>
+    <span class="badge" id="b-tts">tts: …</span>
+  </div>
+</header>
+
+<main>
+  <section>
+    <h2>1 · Reference (native target)</h2>
+    <div class="row">
+      <input type="text" id="ref-text" placeholder="Type a sentence to synthesize…" value="The quick brown fox jumps over the lazy dog." />
+      <button onclick="createReference()">Generate</button>
+      <button class="ghost" onclick="loadReferences()">Refresh</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <select id="ref-select"><option value="">— existing references —</option></select>
+      <button class="ghost" onclick="playSelectedReference()">Listen</button>
+    </div>
+    <audio id="ref-audio" controls></audio>
+  </section>
+
+  <section>
+    <h2>2 · Your attempt</h2>
+    <div class="row">
+      <button id="rec-btn" onclick="toggleRecording()">Record</button>
+      <span id="rec-status" class="muted small">or</span>
+      <input type="file" id="file-input" accept=".wav,.flac,.ogg,.mp3" />
+    </div>
+    <audio id="user-audio" controls></audio>
+    <div class="muted small" id="user-info"></div>
+  </section>
+
+  <section>
+    <h2>3 · Evaluate</h2>
+    <div class="row">
+      <select id="eval-ref"><option value="">— choose reference —</option></select>
+      <button onclick="runEvaluate()" id="eval-btn">Evaluate</button>
+      <span class="muted small">or</span>
+      <input type="text" id="quick-text" placeholder="quick-eval text" style="min-width:160px" />
+      <button class="ghost" onclick="runQuickEvaluate()">Quick evaluate</button>
+    </div>
+    <div id="eval-status" class="muted small" style="margin-top:8px"></div>
+  </section>
+
+  <section id="results" style="display:none">
+    <h2>4 · Results</h2>
+    <div class="cards" id="score-cards"></div>
+    <h3 class="small muted" style="margin:14px 0 4px">Phoneme alignment</h3>
+    <div class="diff" id="phoneme-diff"></div>
+    <h3 class="small muted" style="margin:14px 0 4px">Feedback</h3>
+    <ul class="feedback" id="feedback"></ul>
+  </section>
+
+  <section>
+    <h2>5 · History</h2>
+    <div id="history-list"></div>
+  </section>
+</main>
+
+<script>
+const API = "/api/v1";
+let userBlob = null;      // the recorded/uploaded audio to send
+let recState = "idle";    // idle | recording
+let media = { ctx: null, stream: null, source: null, proc: null, frames: [], rate: 48000 };
+
+/* ---------- helpers ---------- */
+async function jget(url) { const r = await fetch(url); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json(); }
+async function jpost(url, body) {
+  const r = await fetch(url, body ? { method: "POST", body } : { method: "POST" });
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+function setStatus(el, msg, isErr) { el.textContent = msg; el.className = isErr ? "err small" : "muted small"; }
+function gradeClass(g) { return "g-" + (g || ""); }
+
+/* ---------- health ---------- */
+async function refreshHealth() {
+  try {
+    const h = await jget(`${API}/health`);
+    const set = (id, key) => {
+      const el = document.getElementById(id);
+      const m = h.models[key];
+      el.textContent = `${key}: ${m.loaded ? "loaded" : "idle"}${m.load_time_ms ? ` (${m.load_time_ms}ms)` : ""}`;
+      el.classList.toggle("on", m.loaded);
+    };
+    set("b-wav2vec2", "wav2vec2"); set("b-tts", "tts");
+  } catch { /* server warming up */ }
+}
+
+/* ---------- references ---------- */
+async function loadReferences() {
+  try {
+    const refs = await jget(`${API}/references`);
+    const opts = refs.map(r => `<option value="${r.id}">${r.id} — "${r.text.slice(0,40)}" (${r.duration_seconds}s)</option>`);
+    document.getElementById("ref-select").innerHTML = `<option value="">— existing references —</option>` + opts.join("");
+    document.getElementById("eval-ref").innerHTML = `<option value="">— choose reference —</option>` + opts.join("");
+  } catch (e) { console.error(e); }
+}
+async function createReference() {
+  const text = document.getElementById("ref-text").value.trim();
+  if (!text) return;
+  const btn = event.target; btn.disabled = true; btn.textContent = "Generating…";
+  try {
+    await jpost(`${API}/references`, JSON.stringify({ text, language: "en", speaker: "default" }));
+    await loadReferences();
+    refreshHealth();
+  } catch (e) { alert("Failed: " + e.message); }
+  btn.disabled = false; btn.textContent = "Generate";
+}
+function playSelectedReference() {
+  const id = document.getElementById("ref-select").value;
+  if (id) document.getElementById("ref-audio").src = `${API}/references/${id}/audio`;
+}
+
+/* ---------- recording (Web Audio → 16-bit PCM WAV) ---------- */
+async function toggleRecording() {
+  if (recState === "idle") return startRecording();
+  return stopRecording();
+}
+async function startRecording() {
+  try {
+    media.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  } catch (e) { alert("Microphone access denied: " + e.message); return; }
+  media.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  media.rate = media.ctx.sampleRate;
+  media.source = media.ctx.createMediaStreamSource(media.stream);
+  const proc = media.ctx.createScriptProcessor(4096, 1, 1);
+  media.frames = [];
+  proc.onaudioprocess = e => media.frames.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  media.source.connect(proc); proc.connect(media.ctx.destination); media.proc = proc;
+  recState = "recording";
+  const btn = document.getElementById("rec-btn");
+  btn.textContent = "Stop"; btn.classList.add("danger");
+  document.getElementById("rec-status").textContent = "recording…";
+}
+function stopRecording() {
+  if (!media.proc) return;
+  media.proc.disconnect(); media.source.disconnect();
+  media.stream.getTracks().forEach(t => t.stop()); media.ctx.close();
+  const total = media.frames.reduce((n, f) => n + f.length, 0);
+  const merged = new Float32Array(total);
+  for (let i = 0, off = 0; i < media.frames.length; i++) { merged.set(media.frames[i], off); off += media.frames[i].length; }
+  setUserAudio(encodeWav(merged, media.rate), `recorded @ ${media.rate} Hz, ${(total/media.rate).toFixed(1)}s`);
+  recState = "idle";
+  const btn = document.getElementById("rec-btn");
+  btn.textContent = "Record"; btn.classList.remove("danger");
+  document.getElementById("rec-status").textContent = "or";
+}
+document.getElementById("file-input").addEventListener("change", ev => {
+  const f = ev.target.files[0];
+  if (f) setUserAudio(f, `uploaded ${f.name} (${(f.size/1024).toFixed(0)} KB)`);
+});
+function setUserAudio(blob, info) {
+  userBlob = blob;
+  document.getElementById("user-audio").src = URL.createObjectURL(blob);
+  document.getElementById("user-info").textContent = info;
+}
+
+/* WAV (16-bit PCM mono) encoder so the API can always decode the upload */
+function encodeWav(samples, sampleRate) {
+  const buf = new ArrayBuffer(44 + samples.length * 2);
+  const v = new DataView(buf);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, "RIFF"); v.setUint32(4, 36 + samples.length * 2, true); ws(8, "WAVE");
+  ws(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  ws(36, "data"); v.setUint32(40, samples.length * 2, true);
+  let off = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true); off += 2;
+  }
+  return new Blob([v], { type: "audio/wav" });
+}
+
+/* ---------- evaluation ---------- */
+function requireAudio() {
+  if (!userBlob) { alert("Record or upload an attempt first."); return false; }
+  return true;
+}
+async function runEvaluate() {
+  if (!requireAudio()) return;
+  const refId = document.getElementById("eval-ref").value;
+  if (!refId) { alert("Choose a reference first."); return; }
+  const fd = new FormData();
+  fd.append("audio", userBlob, "attempt.wav");
+  fd.append("reference_id", refId);
+  await runEval(() => jpost(`${API}/evaluate`, fd));
+}
+async function runQuickEvaluate() {
+  if (!requireAudio()) return;
+  const text = document.getElementById("quick-text").value.trim();
+  if (!text) { alert("Enter quick-eval text first."); return; }
+  const fd = new FormData();
+  fd.append("audio", userBlob, "attempt.wav");
+  fd.append("text", text); fd.append("language", "en");
+  await runEval(() => jpost(`${API}/evaluate/quick`, fd));
+}
+async function runEval(fn) {
+  const st = document.getElementById("eval-status");
+  const btn = document.getElementById("eval-btn");
+  btn.disabled = true; setStatus(st, "Evaluating (first call loads the models)…");
+  try {
+    const res = await fn();
+    renderResults(res);
+    setStatus(st, `Done — id ${res.id}`);
+    loadHistory(); refreshHealth();
+  } catch (e) { setStatus(st, e.message, true); }
+  btn.disabled = false;
+}
+
+/* ---------- results rendering ---------- */
+function renderResults(res) {
+  document.getElementById("results").style.display = "";
+  const s = res.scores;
+  const card = (label, block) => `<div class="card"><div class="label">${label}</div>
+    <div class="score ${gradeClass(block.grade)}">${block.score}<span class="muted" style="font-size:14px">/100</span></div>
+    <div class="grade ${gradeClass(block.grade)}">${block.grade}</div></div>`;
+  document.getElementById("score-cards").innerHTML =
+    card("Pronunciation", s.pronunciation) + card("Intonation", s.intonation) +
+    card("Fluency", s.fluency) + card("Composite", s.composite);
+
+  document.getElementById("phoneme-diff").innerHTML = res.phoneme_diff.map(op => {
+    if (op.type === "match") return `<span class="ph match">${op.phoneme}</span>`;
+    if (op.type === "sub")   return `<span class="ph sub" title="expected ${op.expected}">${op.actual}</span>`;
+    if (op.type === "del")   return `<span class="ph del" title="deleted">${op.expected}</span>`;
+    return `<span class="ph ins" title="inserted">${op.actual}</span>`;
+  }).join(" ") || `<span class="muted">(empty)</span>`;
+
+  const fb = document.getElementById("feedback");
+  fb.innerHTML = res.feedback.map(f => `<li>${f}</li>`).join("") || `<li class="muted">none</li>`;
+}
+
+/* ---------- history ---------- */
+async function loadHistory() {
+  try {
+    const h = await jget(`${API}/history?limit=20`);
+    const el = document.getElementById("history-list");
+    if (!h.items.length) { el.innerHTML = `<div class="muted small">No evaluations yet.</div>`; return; }
+    el.innerHTML = h.items.map(it =>
+      `<div class="hist" onclick="viewHistory('${it.id}')">
+         <span class="id">${it.id}</span>
+         <span class="${gradeClass(it.composite_grade)}" style="margin-left:8px">${it.composite_score}/100 ${it.composite_grade}</span>
+         <span class="muted small" style="margin-left:8px">${it.created_at}</span>
+       </div>`).join("");
+  } catch (e) { console.error(e); }
+}
+async function viewHistory(id) {
+  try {
+    const data = await jget(`${API}/history/${id}`);
+    renderResults({
+      id: data.id, scores: data.scores, phoneme_diff: data.phoneme_diff, feedback: data.feedback
+    });
+    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+  } catch (e) { alert(e.message); }
+}
+
+/* ---------- init ---------- */
+refreshHealth(); loadReferences(); loadHistory();
+</script>
+</body>
+</html>

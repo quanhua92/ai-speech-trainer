@@ -30,6 +30,18 @@ def client(tmp_path: Path) -> TestClient:
 
 
 # --------------------------------------------------------------------------- #
+# Demo page
+# --------------------------------------------------------------------------- #
+class TestDemo:
+    def test_demo_serves_html(self, client: TestClient) -> None:
+        r = client.get("/demo")
+        assert r.status_code == 200
+        assert "text/html" in r.headers["content-type"]
+        assert "ai-speech-shadowing" in r.text
+        assert "/api/v1" in r.text  # it talks to the API
+
+
+# --------------------------------------------------------------------------- #
 # Health
 # --------------------------------------------------------------------------- #
 class TestHealth:

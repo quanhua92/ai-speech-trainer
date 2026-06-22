@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai_speech_shadowing import __version__
-from ai_speech_shadowing.api.routes import evaluate, health, history, reference
+from ai_speech_shadowing.api.routes import demo, evaluate, health, history, reference
 
 
 def create_app() -> FastAPI:
@@ -37,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(evaluate.router, prefix="/api/v1")
     app.include_router(reference.router, prefix="/api/v1")
     app.include_router(history.router, prefix="/api/v1")
+    app.include_router(demo.router)  # /demo at root — not an API resource
     return app
 
 
