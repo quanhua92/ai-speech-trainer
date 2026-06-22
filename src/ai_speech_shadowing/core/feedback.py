@@ -21,6 +21,7 @@ from ai_speech_shadowing.core.audio import AudioSample
 from ai_speech_shadowing.core.fluency import FluencyDiff
 from ai_speech_shadowing.core.phoneme import PhonemeDiff, PhonemeOp
 from ai_speech_shadowing.core.prosody import ProsodyDiff
+from ai_speech_shadowing.core.wordalign import WordDiff, word_level_diff
 
 DEFAULT_WEIGHTS: tuple[float, float, float] = (0.4, 0.3, 0.3)
 """Composite weights for (pronunciation, intonation, fluency)."""
@@ -67,6 +68,7 @@ class FeedbackReport:
     pause_count_hypothesis: int
     phoneme_diff: PhonemeDiff
     feedback: tuple[str, ...]
+    words: tuple[WordDiff, ...] = ()
 
 
 def build_report(
@@ -75,12 +77,14 @@ def build_report(
     fluency_diff: FluencyDiff,
     *,
     weights: tuple[float, float, float] = DEFAULT_WEIGHTS,
+    reference_text: str | None = None,
 ) -> FeedbackReport:
     """Combine the three pillar diffs into a FeedbackReport.
 
     Pronunciation score = phoneme accuracy (1 - PER); intonation = prosody
     sub-score; fluency = fluency sub-score. Each is in [0, 100]. The composite
-    is the weighted sum.
+    is the weighted sum. When ``reference_text`` is given, a best-effort
+    word-level diff is attached (see :mod:`ai_speech_shadowing.core.wordalign`).
     """
     if not (0.99 <= sum(weights) <= 1.01):
         raise ValueError(f"weights must sum to ~1.0; got {sum(weights)}")
@@ -92,6 +96,12 @@ def build_report(
     composite = round(pron * w0 + into * w1 + flu * w2)
 
     feedback = _generate_feedback(phoneme_diff, prosody_diff, fluency_diff, pron, into, flu)
+
+    words: tuple[WordDiff, ...] = ()
+    if reference_text:
+        words = tuple(
+            word_level_diff(reference_text, phoneme_diff.reference, phoneme_diff.operations)
+        )
 
     return FeedbackReport(
         composite_score=composite,
@@ -110,6 +120,7 @@ def build_report(
         pause_count_hypothesis=fluency_diff.hypothesis_pauses.count,
         phoneme_diff=phoneme_diff,
         feedback=tuple(feedback),
+        words=words,
     )
 
 
@@ -174,8 +185,14 @@ def evaluate(
     *,
     phoneme_extractor: object | None = None,
     weights: tuple[float, float, float] = DEFAULT_WEIGHTS,
+    reference_text: str | None = None,
 ) -> FeedbackReport:
-    """Run the full evaluation pipeline and return a FeedbackReport."""
+    """Run the full evaluation pipeline and return a FeedbackReport.
+
+    If ``reference_text`` is supplied (the native sentence the user was aiming
+    at), the report carries a best-effort word-level diff in addition to the
+    exact phoneme-level one.
+    """
     from ai_speech_shadowing.core.fluency import compare_fluency
     from ai_speech_shadowing.core.phoneme import diff_phonemes, get_extractor
     from ai_speech_shadowing.core.prosody import compare_pitch, extract_pitch
@@ -187,7 +204,13 @@ def evaluate(
 
     prosody_diff = compare_pitch(extract_pitch(reference_sample), extract_pitch(hypothesis_sample))
     fluency_diff = compare_fluency(reference_sample, hypothesis_sample)
-    return build_report(phoneme_diff, prosody_diff, fluency_diff, weights=weights)
+    return build_report(
+        phoneme_diff,
+        prosody_diff,
+        fluency_diff,
+        weights=weights,
+        reference_text=reference_text,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -234,6 +257,10 @@ def report_to_dict(report: FeedbackReport) -> dict[str, object]:
         "phoneme_error_rate": round(report.phoneme_error_rate, 4),
         "weights": list(report.weights),
         "phoneme_diff": [_op_to_dict(op) for op in report.phoneme_diff.operations],
+        "words": [
+            {"word": w.word, "status": w.status, "errors": [dict(e) for e in w.errors]}
+            for w in report.words
+        ],
         "feedback": list(report.feedback),
     }
 
@@ -265,6 +292,10 @@ def to_terminal(report: FeedbackReport) -> str:
         lines.append("Feedback:")
         for msg in report.feedback:
             lines.append(f"  • {msg}")
+    if report.words:
+        lines.append("Words (best-effort):")
+        rendered = " ".join(f"[{w.word}]" if w.status != "match" else w.word for w in report.words)
+        lines.append(f"  {rendered}")
     return "\n".join(lines)
 
 
@@ -293,4 +324,11 @@ def to_markdown(report: FeedbackReport) -> str:
         lines.append("**Feedback:**")
         for msg in report.feedback:
             lines.append(f"- {msg}")
+    if report.words:
+        lines.append("")
+        lines.append("**Words (best-effort highlight):**")
+        rendered = " ".join(
+            f"**{w.word}**" if w.status != "match" else w.word for w in report.words
+        )
+        lines.append(rendered)
     return "\n".join(lines)

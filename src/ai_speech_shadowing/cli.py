@@ -297,6 +297,13 @@ def evaluate_cmd(
     history_dir: Annotated[
         Path, typer.Option("--history-dir", help="Where to save the report.")
     ] = DEFAULT_HISTORY_DIR,
+    reference_text: Annotated[
+        str | None,
+        typer.Option(
+            "--reference-text",
+            help="The native sentence (enables best-effort word-level highlighting).",
+        ),
+    ] = None,
 ) -> None:
     """Full evaluation: pronunciation + prosody + fluency → unified report.
 
@@ -307,7 +314,7 @@ def evaluate_cmd(
     ref = prep(AudioSample.from_wav(reference))
     hyp = prep(AudioSample.from_wav(hypothesis))
     typer.echo("Loading model & evaluating...", err=True)
-    report = evaluate(ref, hyp, weights=_parse_weights(weights))
+    report = evaluate(ref, hyp, weights=_parse_weights(weights), reference_text=reference_text)
 
     if not no_save:
         path = save_report(report, history_dir=history_dir)

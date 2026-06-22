@@ -123,7 +123,9 @@
   <section id="results" style="display:none">
     <h2>4 · Results</h2>
     <div class="cards" id="score-cards"></div>
-    <h3 class="small muted" style="margin:14px 0 4px">Phoneme alignment</h3>
+    <h3 class="small muted" style="margin:14px 0 4px">Word highlight <span class="muted">(best-effort · which words)</span></h3>
+    <div class="diff" id="word-diff" style="font-size:18px;line-height:2"></div>
+    <h3 class="small muted" style="margin:14px 0 4px">Phoneme alignment <span class="muted">(exact · which sounds)</span></h3>
     <div class="diff" id="phoneme-diff"></div>
     <h3 class="small muted" style="margin:14px 0 4px">Feedback</h3>
     <ul class="feedback" id="feedback"></ul>
@@ -298,6 +300,20 @@ function renderResults(res) {
   document.getElementById("score-cards").innerHTML =
     card("Pronunciation", s.pronunciation) + card("Intonation", s.intonation) +
     card("Fluency", s.fluency) + card("Composite", s.composite);
+
+  // word-level (best-effort): highlights which words are wrong; each chip carries
+  // its phoneme errors as a tooltip.
+  const wordEl = document.getElementById("word-diff");
+  const errsToStr = (errs) => errs.map(e =>
+    e.type === "sub" ? `/${e.expected}/ → /${e.actual}/`
+    : e.type === "del" ? `missing /${e.expected}/`
+    : `extra /${e.actual}/`
+  ).join("; ");
+  wordEl.innerHTML = (res.words && res.words.length)
+    ? res.words.map(w =>
+        `<span class="ph ${w.status === "match" ? "match" : w.status}" title="${errsToStr(w.errors) || "ok"}">${w.word}</span>`
+      ).join(" ")
+    : `<span class="muted">(word highlight needs the reference text)</span>`;
 
   document.getElementById("phoneme-diff").innerHTML = res.phoneme_diff.map(op => {
     if (op.type === "match") return `<span class="ph match">${op.phoneme}</span>`;

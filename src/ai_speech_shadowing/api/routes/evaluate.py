@@ -29,14 +29,18 @@ def _decode_upload(upload: UploadFile) -> AudioSample:
 
 
 def _run_evaluation(
-    *, reference_audio: AudioSample, user_audio: AudioSample, reference_id: str | None
+    *,
+    reference_audio: AudioSample,
+    user_audio: AudioSample,
+    reference_id: str | None,
+    reference_text: str | None = None,
 ) -> EvaluationResponse:
     """Preprocess both signals, evaluate, persist, and build the API response."""
     state = get_state()
     extractor = state.phoneme_extractor()
     ref = preprocess(reference_audio)
     hyp = preprocess(user_audio)
-    report = evaluate_pipeline(ref, hyp, phoneme_extractor=extractor)
+    report = evaluate_pipeline(ref, hyp, phoneme_extractor=extractor, reference_text=reference_text)
 
     path = save_report(report, history_dir=state.history_dir)
     # stamp reference_id onto the saved report for history/stats
@@ -82,8 +86,13 @@ def evaluate(
         )
     reference_audio = AudioSample.from_wav(ref_file)
     user_audio = _decode_upload(audio)
+    # pull the reference's source text for word-level highlighting
+    reference_text = str(state.reference_manager.read_metadata(reference_id).get("text", ""))
     return _run_evaluation(
-        reference_audio=reference_audio, user_audio=user_audio, reference_id=reference_id
+        reference_audio=reference_audio,
+        user_audio=user_audio,
+        reference_id=reference_id,
+        reference_text=reference_text or None,
     )
 
 
@@ -109,4 +118,5 @@ def evaluate_quick(
         reference_audio=reference_audio,
         user_audio=user_audio,
         reference_id=slugify(text),
+        reference_text=text,
     )

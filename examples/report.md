@@ -10,3 +10,6 @@
 
 **Feedback:**
 - Your rhythm diverges from the reference; shadow the native pacing.
+
+**Words (best-effort highlight):**
+The quick brown fox **jumps** over **the** lazy dog

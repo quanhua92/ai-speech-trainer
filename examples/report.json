@@ -159,6 +159,70 @@
       "phoneme": "ɡ"
     }
   ],
+  "words": [
+    {
+      "word": "The",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "quick",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "brown",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "fox",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "jumps",
+      "status": "sub",
+      "errors": [
+        {
+          "type": "sub",
+          "expected": "s",
+          "actual": "t"
+        }
+      ]
+    },
+    {
+      "word": "over",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "the",
+      "status": "sub",
+      "errors": [
+        {
+          "type": "sub",
+          "expected": "ð",
+          "actual": "ɹ"
+        },
+        {
+          "type": "sub",
+          "expected": "ə",
+          "actual": "ɐ"
+        }
+      ]
+    },
+    {
+      "word": "lazy",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "dog",
+      "status": "match",
+      "errors": []
+    }
+  ],
   "feedback": [
     "Your rhythm diverges from the reference; shadow the native pacing."
   ]

@@ -138,6 +138,9 @@ class TestEvaluateFlow:
         assert isinstance(body["phoneme_diff"], list)
         assert isinstance(body["feedback"], list)
 
+        # quick-eval knows the reference text -> word-level diff is attached
+        assert isinstance(body.get("words"), list) and body["words"]
+
         # the reference was generated on the fly and is now listed
         refs = client.get("/api/v1/references").json()
         assert any(ref["id"] == body["reference_id"] for ref in refs)

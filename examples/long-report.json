@@ -1,0 +1,2296 @@
+{
+  "composite": {
+    "score": 90,
+    "grade": "good"
+  },
+  "scores": {
+    "pronunciation": {
+      "score": 93,
+      "grade": "good"
+    },
+    "intonation": {
+      "score": 95,
+      "grade": "good",
+      "pitch_range_ratio": 0.948,
+      "monotone": false
+    },
+    "fluency": {
+      "score": 82,
+      "grade": "good",
+      "dtw_normalized_distance": 0.0882,
+      "syllable_rate_reference": 2.076,
+      "syllable_rate_hypothesis": 2.083,
+      "pause_count_reference": 0,
+      "pause_count_hypothesis": 0
+    }
+  },
+  "phoneme_error_rate": 0.0686,
+  "weights": [
+    0.4,
+    0.3,
+    0.3
+  ],
+  "phoneme_diff": [
+    {
+      "type": "match",
+      "phoneme": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɔːɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɑːɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "dʒ"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ŋ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɡ"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "dʒ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɑː"
+    },
+    {
+      "type": "sub",
+      "expected": "d",
+      "actual": "ɾ"
+    },
+    {
+      "type": "sub",
+      "expected": "əl",
+      "actual": "oʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "aʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɚ"
+    },
+    {
+      "type": "del",
+      "expected": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "f"
+    },
+    {
+      "type": "match",
+      "phoneme": "əl"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "j"
+    },
+    {
+      "type": "match",
+      "phoneme": "uː"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɾ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɚ"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "oʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɡ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɾ"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "aɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "uː"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɚ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɑːɹ"
+    },
+    {
+      "type": "sub",
+      "expected": "t",
+      "actual": "ɾ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ð"
+    },
+    {
+      "type": "sub",
+      "expected": "ɛ",
+      "actual": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɚ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "h"
+    },
+    {
+      "type": "match",
+      "phoneme": "uː"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ŋ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɡ"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "dʒ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɜː"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "iː"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "v"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "aʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "del",
+      "expected": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "v"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "f"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "b"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɑːɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɾ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "əl"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "b"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "aɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "b"
+    },
+    {
+      "type": "match",
+      "phoneme": "aɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ŋ"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "sub",
+      "expected": "ɔː",
+      "actual": "aʊ"
+    },
+    {
+      "type": "ins",
+      "actual": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "ð"
+    },
+    {
+      "type": "match",
+      "phoneme": "iː"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɜː"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɜː"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "h"
+    },
+    {
+      "type": "match",
+      "phoneme": "aʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "h"
+    },
+    {
+      "type": "match",
+      "phoneme": "j"
+    },
+    {
+      "type": "match",
+      "phoneme": "uː"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "ins",
+      "actual": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "iː"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "aɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "sub",
+      "expected": "b",
+      "actual": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɚ"
+    },
+    {
+      "type": "sub",
+      "expected": "ɾ",
+      "actual": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɡ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ŋ"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "tʃ"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɜː"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʃ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "sub",
+      "expected": "k",
+      "actual": "ɡ"
+    },
+    {
+      "type": "sub",
+      "expected": "ʌ",
+      "actual": "oʊ"
+    },
+    {
+      "type": "del",
+      "expected": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "b"
+    },
+    {
+      "type": "ins",
+      "actual": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "v"
+    },
+    {
+      "type": "match",
+      "phoneme": "ð"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "eɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ŋ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "sub",
+      "expected": "ʌ",
+      "actual": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "uː"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "i"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "eɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ŋ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɚ"
+    },
+    {
+      "type": "match",
+      "phoneme": "j"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɚ"
+    },
+    {
+      "type": "match",
+      "phoneme": "h"
+    },
+    {
+      "type": "sub",
+      "expected": "ɑːɹ",
+      "actual": "ɜː"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "tʃ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "ins",
+      "actual": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "eɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ŋ"
+    },
+    {
+      "type": "del",
+      "expected": "ɡ"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "dʒ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ᵻ"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "aɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "sub",
+      "expected": "i",
+      "actual": "iː"
+    },
+    {
+      "type": "match",
+      "phoneme": "eɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɾ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "v"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "oʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "i"
+    },
+    {
+      "type": "del",
+      "expected": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "ins",
+      "actual": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "iː"
+    },
+    {
+      "type": "match",
+      "phoneme": "v"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "oʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "oʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɡ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "tʃ"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "sub",
+      "expected": "w",
+      "actual": "ə"
+    },
+    {
+      "type": "del",
+      "expected": "ɪ"
+    },
+    {
+      "type": "del",
+      "expected": "θ"
+    },
+    {
+      "type": "match",
+      "phoneme": "j"
+    },
+    {
+      "type": "match",
+      "phoneme": "uː"
+    },
+    {
+      "type": "del",
+      "expected": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "dʒ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "aɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "iː"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɜː"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "ins",
+      "actual": "ʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "dʒ"
+    },
+    {
+      "type": "ins",
+      "actual": "j"
+    },
+    {
+      "type": "match",
+      "phoneme": "uː"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "aɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "oʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "h"
+    },
+    {
+      "type": "match",
+      "phoneme": "aʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɜː"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɔːɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "iː"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɛ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɡ"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "match",
+      "phoneme": "əl"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "v"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɾ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "del",
+      "expected": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "æ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "uː"
+    }
+  ],
+  "words": [
+    {
+      "word": "An",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "LLM",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "or",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "large",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "language",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "model",
+      "status": "sub",
+      "errors": [
+        {
+          "type": "sub",
+          "expected": "d",
+          "actual": "ɾ"
+        }
+      ]
+    },
+    {
+      "word": "is",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "a",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "powerful",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "computer",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "program",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "It",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "acts",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "like",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "super",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "smart",
+      "status": "sub",
+      "errors": [
+        {
+          "type": "sub",
+          "expected": "t",
+          "actual": "ɾ"
+        }
+      ]
+    },
+    {
+      "word": "assistant",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "that",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "understands",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "human",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "To",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "learn",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "it",
+      "status": "del",
+      "errors": [
+        {
+          "type": "del",
+          "expected": "t"
+        }
+      ]
+    },
+    {
+      "word": "reads",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "massive",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "amounts",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "of",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "text",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "from",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "books",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "articles",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "and",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "websites",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "By",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "looking",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "at",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "all",
+      "status": "sub",
+      "errors": [
+        {
+          "type": "sub",
+          "expected": "ɔː",
+          "actual": "aʊ"
+        },
+        {
+          "type": "ins",
+          "actual": "l"
+        }
+      ]
+    },
+    {
+      "word": "these",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "words",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "learns",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "how",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "humans",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "speak",
+      "status": "ins",
+      "errors": [
+        {
+          "type": "ins",
+          "actual": "s"
+        }
+      ]
+    },
+    {
+      "word": "write",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "becomes",
+      "status": "sub",
+      "errors": [
+        {
+          "type": "sub",
+          "expected": "b",
+          "actual": "p"
+        }
+      ]
+    },
+    {
+      "word": "an",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "expert",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "guessing",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "which",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "word",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "should",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "come",
+      "status": "sub",
+      "errors": [
+        {
+          "type": "sub",
+          "expected": "k",
+          "actual": "ɡ"
+        },
+        {
+          "type": "sub",
+          "expected": "ʌ",
+          "actual": "oʊ"
+        },
+        {
+          "type": "del",
+          "expected": "m"
+        }
+      ]
+    },
+    {
+      "word": "next",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "in",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "sentence",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "Because",
+      "status": "ins",
+      "errors": [
+        {
+          "type": "ins",
+          "actual": "ɪ"
+        }
+      ]
+    },
+    {
+      "word": "this",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "training",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "can",
+      "status": "ins",
+      "errors": [
+        {
+          "type": "ins",
+          "actual": "ə"
+        }
+      ]
+    },
+    {
+      "word": "do",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "many",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "amazing",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "tasks",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "answer",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "your",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "hard",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "questions",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "translate",
+      "status": "ins",
+      "errors": [
+        {
+          "type": "ins",
+          "actual": "d"
+        }
+      ]
+    },
+    {
+      "word": "languages",
+      "status": "del",
+      "errors": [
+        {
+          "type": "del",
+          "expected": "ɡ"
+        }
+      ]
+    },
+    {
+      "word": "creative",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "stories",
+      "status": "del",
+      "errors": [
+        {
+          "type": "del",
+          "expected": "z"
+        }
+      ]
+    },
+    {
+      "word": "even",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "code",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "programs",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "chat",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "with",
+      "status": "sub",
+      "errors": [
+        {
+          "type": "sub",
+          "expected": "w",
+          "actual": "ə"
+        },
+        {
+          "type": "del",
+          "expected": "ɪ"
+        }
+      ]
+    },
+    {
+      "word": "you",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "just",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "real",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "person",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "Would",
+      "status": "ins",
+      "errors": [
+        {
+          "type": "ins",
+          "actual": "ʊ"
+        }
+      ]
+    },
+    {
+      "word": "to",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "know",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "see",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "examples",
+      "status": "match",
+      "errors": []
+    },
+    {
+      "word": "what",
+      "status": "match",
+      "errors": []
+    }
+  ],
+  "feedback": [
+    "Great job — your delivery closely matches the reference."
+  ]
+}

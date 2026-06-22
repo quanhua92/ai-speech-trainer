@@ -73,12 +73,19 @@ class PhonemeDiffItem(BaseModel):
     actual: str | None = None
 
 
+class WordDiffItem(BaseModel):
+    word: str
+    status: str  # match | sub | del | ins
+    errors: list[PhonemeDiffItem] = []
+
+
 class EvaluationResponse(BaseModel):
     id: str
     created_at: str
     reference_id: str | None
     scores: Scores
     phoneme_diff: list[PhonemeDiffItem]
+    words: list[WordDiffItem] = []
     feedback: list[str]
 
 
@@ -116,6 +123,14 @@ def build_evaluation_response(
             composite=CompositeScore(score=report.composite_score, grade=report.composite_grade),
         ),
         phoneme_diff=[PhonemeDiffItem(**_op_to_dict(op)) for op in report.phoneme_diff.operations],
+        words=[
+            WordDiffItem(
+                word=w.word,
+                status=w.status,
+                errors=[PhonemeDiffItem(**e) for e in w.errors],
+            )
+            for w in report.words
+        ],
         feedback=list(report.feedback),
     )
 

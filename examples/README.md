@@ -1,4 +1,21 @@
-# Examples — sample evaluation report
+# Examples — sample evaluation reports
+
+Real end-to-end evaluations so you can see exactly what the engine produces,
+without running anything. Two scenarios:
+
+| Example | Length | Shows | Files |
+| --- | --- | --- | --- |
+| **Fox** (short) | 9 words | full report **incl. word-level highlight** (exact phoneme diff too) | `report.*` |
+| **LLM passage** (long) | ~75 words / ~40 s | report at scale — scores + feedback + the exact phoneme strip | `long-report.*`, `long-passage.md` |
+
+> The fox example is the best showcase of the "where you're wrong" feature:
+> both a **word highlight** (which words) and the **phoneme strip** (which sounds).
+> The long example omits the word-level view — its best-effort alignment drifts
+> over a ~430-phoneme sequence; the phoneme strip and scores stay exact at any length.
+
+---
+
+## Example 1 — Fox sentence (short, with word highlight)
 
 A real end-to-end evaluation so you can see exactly what the engine produces,
 without running anything. Generated on the bundled default reference.
@@ -43,7 +60,15 @@ Composite Score:       87/100  🟢 good
 ────────────────────────────────────────────────────
 Feedback:
   • Your rhythm diverges from the reference; shadow the native pacing.
+Words (best-effort):
+  The quick brown fox [jumps] over [the] lazy dog
 ```
+
+Two complementary "where you're wrong" views ship together:
+
+- **Word highlight** (best-effort) — the reference sentence with the wrong
+  *words* marked (`[jumps]`, `[the]`). Tells the learner **which** word.
+- **Phoneme strip** (exact) — the `/s/→/t/`, `/ð/→/ɹ/` chips. Tells them **how**.
 
 ## Reading it
 
