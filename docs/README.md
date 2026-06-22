@@ -206,16 +206,17 @@ Because a user might speak slower or faster than the native reference without ne
 
 ---
 
-### Phase 1 — Audio Preprocessing Pipeline
+### Phase 1 — Audio Preprocessing Pipeline ✅
 
 > **Goal:** Build the foundational audio I/O and normalization layer.
+> **Done** — see [`audio-preprocessing.md`](audio-preprocessing.md) for the full API reference.
 
-- [ ] Implement WAV file loader with format validation
-- [ ] Build resampling utility → force all audio to **16kHz mono**
-- [ ] Implement silence trimming via `librosa.effects.split`
-- [ ] Add optional volume normalization (peak / RMS normalization)
-- [ ] Write unit tests with fixture WAV files
-- [ ] Create a `preprocess` CLI command for standalone testing
+- [x] Implement WAV file loader with format validation
+- [x] Build resampling utility → force all audio to **16kHz mono**
+- [x] Implement silence trimming via `librosa.effects.split`
+- [x] Add optional volume normalization (peak / RMS normalization)
+- [x] Write unit tests with fixture WAV files
+- [x] Create a `preprocess` CLI command for standalone testing
 
 **Key Design Decision:** All downstream modules receive a standardized `AudioSample` dataclass: `(waveform: np.ndarray, sample_rate: int = 16000)`.
 
