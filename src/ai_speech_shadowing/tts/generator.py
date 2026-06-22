@@ -88,11 +88,45 @@ class ReferenceManager:
         self.config = config or ReferenceConfig()
 
     # ---- naming & paths -------------------------------------------------
-    def voice_profile(self, *, lang: str | None = None, engine: str | None = None) -> str:
+    def voice_profile(
+        self,
+        *,
+        lang: str | None = None,
+        engine: str | None = None,
+        voice: str | None = None,
+    ) -> str:
+        """Profile folder name: ``{engine}-{iso}-{voice}`` (e.g. kokoro-en-us-af_heart).
+
+        Including the voice lets the same text exist with different voices
+        without overwriting. Falls back to ``default_voice`` / ``default_lang``.
+        """
         lang = lang or self.config.default_lang
         engine = engine or self.config.engine
+        voice = voice or self.config.default_voice
         iso = KOKORO_LANGUAGES.get(lang, lang)
-        return f"{engine}-{iso}"
+        return f"{engine}-{iso}-{voice}"
+
+    def _profile_for_slug(self, slug: str) -> str:
+        """Return the voice profile for an existing reference (from its metadata).
+
+        Falls back to the default profile if the reference has no metadata or
+        the old-style ``kokoro-en-us`` folder exists (backward compat).
+        """
+        meta = self.read_metadata(slug)
+        voice = (
+            str(meta.get("default_speaker", self.config.default_voice))
+            if meta
+            else self.config.default_voice
+        )
+        profile = self.voice_profile(voice=voice)
+        # backward compat: if the new-profile folder doesn't exist but the old one does
+        new_path = self.audio_dir(slug, profile)
+        if not new_path.is_dir():
+            old_profile = self.voice_profile(lang=self.config.default_lang, voice=None)
+            old_profile = old_profile.rsplit("-", 1)[0]  # strip voice suffix
+            if self.audio_dir(slug, old_profile).is_dir():
+                return old_profile
+        return profile
 
     def slug_path(self, slug: str) -> Path:
         return self.config.base_dir / slug
@@ -123,7 +157,7 @@ class ReferenceManager:
         data.setdefault("default_speaker", voice)
         data["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
 
-        profile = self.voice_profile(lang=lang)
+        profile = self.voice_profile(lang=lang, voice=voice)
         audio_entry: dict[str, object] = {
             "file": f"audio/{profile}/{DEFAULT_REF_FILENAME}",
             "sample_rate": KOKORO_SAMPLE_RATE,
@@ -174,7 +208,7 @@ class ReferenceManager:
         voice = voice or self.config.default_voice
         lang = lang or self.config.default_lang
         slug = slugify(text)
-        profile = self.voice_profile(lang=lang)
+        profile = self.voice_profile(lang=lang, voice=voice)
         out = self.audio_file(slug, profile)
         if out.is_file() and not force:
             return out

@@ -68,6 +68,17 @@
           <option value="">— existing references —</option>
         </select>
       </div>
+      <div class="flex gap-2 items-center mt-2">
+        <select id="voice-lang" onchange="updateVoices()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs">
+          <option value="en">English (US)</option>
+          <option value="en-gb">English (UK)</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="ja">Japanese</option>
+          <option value="zh">Chinese</option>
+        </select>
+        <select id="voice-name" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs"></select>
+      </div>
       <div id="ref-text-display" class="text-sm text-text mt-2 mb-1 italic"></div>
       <audio id="ref-audio" controls class="w-full mt-2"></audio>
     </section>
@@ -167,6 +178,23 @@ async function jpost(url, body) {
 }
 function setStatus(el, msg, isErr) { el.textContent = msg; el.className = isErr ? "text-bad text-xs" : "text-muted text-xs"; }
 function gradeClass(g) { return "g-" + (g || ""); }
+
+/* ---------- voice / language ---------- */
+const VOICES = {
+  "en":    ["af_heart","af_bella","af_nicole","af_sky","am_adam","am_michael"],
+  "en-gb": ["bf_emma","bf_isabella","bf_alice","bm_george","bm_lewis"],
+  "es":    ["ef_silvia","em_alex"],
+  "fr":    ["ff_siwis"],
+  "ja":    ["jf_alpha","jf_gongitsune","jf_nezumi","jm_kumo"],
+  "zh":    ["zf_xiaobei","zf_xiaoni","zf_xiaoxiao","zf_xiaoyi","zm_yunjian","zm_yunxi","zm_yunxia"],
+};
+function updateVoices() {
+  const lang = document.getElementById("voice-lang").value;
+  const list = VOICES[lang] || VOICES["en"];
+  document.getElementById("voice-name").innerHTML =
+    list.map(v => `<option value="${v}">${v}</option>`).join("");
+}
+updateVoices();
 function seekAudio(elId, ratio) {
   // Seek BOTH audio players to ~1s before the proportional position so the
   // whole word/sound is heard in context, not just its first frame.
@@ -216,7 +244,9 @@ async function createReference() {
   if (!text) return;
   const btn = document.getElementById("btn-gen"); btn.disabled = true; btn.textContent = "...";
   try {
-    const ref = await jpost(`${API}/references`, JSON.stringify({ text, language: "en", speaker: "default" }));
+    const voice = document.getElementById("voice-name").value;
+    const lang = document.getElementById("voice-lang").value;
+    const ref = await jpost(`${API}/references`, JSON.stringify({ text, language: lang, speaker: voice }));
     await loadReferences();
     document.getElementById("ref-select").value = ref.id;
     setAudio("ref-audio", `${API}/references/${ref.id}/audio`, "reference(gen)");

@@ -119,7 +119,7 @@ def evaluate(
 ) -> EvaluationResponse:
     """Evaluate user audio against a pre-generated reference."""
     state = get_state()
-    profile = state.reference_manager.voice_profile()
+    profile = state.reference_manager._profile_for_slug(reference_id)
     ref_file = state.reference_manager.audio_file(reference_id, profile)
     if not ref_file.is_file():
         raise HTTPException(

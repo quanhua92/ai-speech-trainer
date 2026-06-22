@@ -32,7 +32,7 @@ def _build_response(slug: str) -> ReferenceResponse:
     meta = state.reference_manager.read_metadata(slug)
     if not meta:
         raise HTTPException(status_code=404, detail=f"reference {slug!r} not found")
-    profile = state.reference_manager.voice_profile()
+    profile = state.reference_manager._profile_for_slug(slug)
     audio_file = state.reference_manager.audio_file(slug, profile)
     duration_seconds = 0.0
     if audio_file.is_file():
@@ -92,7 +92,7 @@ def delete_reference(slug: str) -> None:
 @router.get("/{slug}/audio")
 def get_reference_audio(slug: str) -> FileResponse:
     state = get_state()
-    profile = state.reference_manager.voice_profile()
+    profile = state.reference_manager._profile_for_slug(slug)
     audio_file = state.reference_manager.audio_file(slug, profile)
     if not audio_file.is_file():
         raise HTTPException(status_code=404, detail=f"no audio for reference {slug!r}")

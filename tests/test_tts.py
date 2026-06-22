@@ -59,18 +59,19 @@ class TestSlugify:
 # --------------------------------------------------------------------------- #
 class TestReferenceManagerStructure:
     def test_voice_profile_default(self, manager: ReferenceManager) -> None:
-        assert manager.voice_profile() == "kokoro-en-us"
+        assert manager.voice_profile() == "kokoro-en-us-af_heart"
 
     def test_voice_profile_other_lang(self, manager: ReferenceManager) -> None:
-        assert manager.voice_profile(lang="j") == "kokoro-ja"
+        assert manager.voice_profile(lang="j", voice="jf_alpha") == "kokoro-ja-jf_alpha"
+        assert manager.voice_profile(lang="j") == "kokoro-ja-af_heart"
 
     def test_paths(self, manager: ReferenceManager) -> None:
         assert manager.slug_path("hi") == manager.config.base_dir / "hi"
         assert manager.metadata_path("hi") == manager.config.base_dir / "hi" / "metadata.json"
-        assert manager.audio_dir("hi", "kokoro-en-us") == (
-            manager.config.base_dir / "hi" / "audio" / "kokoro-en-us"
+        assert manager.audio_dir("hi", "kokoro-en-us-af_heart") == (
+            manager.config.base_dir / "hi" / "audio" / "kokoro-en-us-af_heart"
         )
-        assert manager.audio_file("hi", "kokoro-en-us").name == "ref.wav"
+        assert manager.audio_file("hi", "kokoro-en-us-af_heart").name == "ref.wav"
 
     def test_exists_false_then_true(self, manager: ReferenceManager) -> None:
         assert manager.exists("hi") is False
@@ -87,7 +88,7 @@ class TestMetadata:
         assert meta["text"] == "Hello"
         assert meta["language"] == "en-us"
         assert meta["default_speaker"] == "af_heart"
-        assert "kokoro-en-us" in meta["audio"]
+        assert "kokoro-en-us-af_heart" in meta["audio"]
 
     def test_merge_multiple_profiles(self, manager: ReferenceManager) -> None:
         manager.write_metadata("hi", "Hello", "a", "af_heart")
@@ -97,8 +98,8 @@ class TestMetadata:
         )
         manager.write_metadata("hi", "Hello", "j", "jf_alpha")
         meta = manager.read_metadata("hi")
-        assert "kokoro-en-us" in meta["audio"]
-        assert "kokoro-ja" in meta["audio"]
+        assert "kokoro-en-us-af_heart" in meta["audio"]
+        assert "kokoro-ja-jf_alpha" in meta["audio"]
         # original text/language are preserved (setdefault)
         assert meta["text"] == "Hello"
         assert meta["default_speaker"] == "af_heart"
@@ -141,7 +142,7 @@ class TestGenerate:
         # metadata written alongside
         meta = manager.read_metadata(slugify("Hello world"))
         assert meta["text"] == "Hello world"
-        assert "kokoro-en-us" in meta["audio"]
+        assert "kokoro-en-us-af_heart" in meta["audio"]
 
     def test_cache_skips_regeneration(self, manager: ReferenceManager, tmp_path: Path) -> None:
         out1 = manager.generate("Hello world")
