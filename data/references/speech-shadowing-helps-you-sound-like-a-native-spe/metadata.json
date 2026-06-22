@@ -2,10 +2,60 @@
   "text": "Speech shadowing helps you sound like a native speaker.",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T16:55:53+00:00",
+  "updated_at": "2026-06-22T19:14:38+00:00",
   "audio": {
     "kokoro-en-us-af_heart": {
       "file": "audio/kokoro-en-us-af_heart/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-us-af_bella": {
+      "file": "audio/kokoro-en-us-af_bella/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-us-af_nicole": {
+      "file": "audio/kokoro-en-us-af_nicole/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-us-af_sky": {
+      "file": "audio/kokoro-en-us-af_sky/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-us-am_adam": {
+      "file": "audio/kokoro-en-us-am_adam/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-us-am_michael": {
+      "file": "audio/kokoro-en-us-am_michael/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-gb-bf_emma": {
+      "file": "audio/kokoro-en-gb-bf_emma/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-gb-bf_isabella": {
+      "file": "audio/kokoro-en-gb-bf_isabella/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-gb-bf_alice": {
+      "file": "audio/kokoro-en-gb-bf_alice/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-gb-bm_george": {
+      "file": "audio/kokoro-en-gb-bm_george/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    },
+    "kokoro-en-gb-bm_lewis": {
+      "file": "audio/kokoro-en-gb-bm_lewis/ref.wav",
       "sample_rate": 24000,
       "engine": "kokoro"
     }

@@ -1,0 +1,13 @@
+{
+  "text": "Record an attempt and click Evaluate to see scores, phoneme alignment, and feedback here.",
+  "language": "en-us",
+  "default_speaker": "am_adam",
+  "updated_at": "2026-06-22T18:55:19+00:00",
+  "audio": {
+    "kokoro-en-us-am_adam": {
+      "file": "audio/kokoro-en-us-am_adam/ref.wav",
+      "sample_rate": 24000,
+      "engine": "kokoro"
+    }
+  }
+}
