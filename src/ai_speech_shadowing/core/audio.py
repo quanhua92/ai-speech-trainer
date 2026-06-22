@@ -107,6 +107,25 @@ class AudioSample:
             raise AudioLoadError(f"failed to decode {p}: {e}") from e
         return cls(waveform=np.ascontiguousarray(data), sample_rate=int(sr))
 
+    @classmethod
+    def from_bytes(cls, data: bytes) -> AudioSample:
+        """Load and validate audio straight from a byte string (e.g. an upload).
+
+        Raises:
+            AudioLoadError: If the bytes can't be decoded or are empty.
+        """
+        import io
+
+        if not data:
+            raise AudioLoadError("empty audio buffer")
+        try:
+            arr, sr = sf.read(io.BytesIO(data), dtype="float32", always_2d=False)
+        except RuntimeError as e:
+            raise AudioLoadError(f"failed to decode audio buffer: {e}") from e
+        if sr <= 0 or arr.size == 0:
+            raise AudioLoadError("invalid or empty audio buffer")
+        return cls(waveform=np.ascontiguousarray(arr), sample_rate=int(sr))
+
     def to_wav(
         self,
         path: str | PathLike[str],

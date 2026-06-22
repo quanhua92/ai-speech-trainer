@@ -28,6 +28,14 @@ test:
 test-slow:
     PYTORCH_ENABLE_MPS_FALLBACK=1 uv run pytest --runslow
 
+# Serve the REST API (FastAPI + uvicorn) at /api/v1.
+serve:
+    uv run ai-speech-shadowing serve
+
+# End-to-end REST API test (starts its own server, real Kokoro A-vs-B speech).
+e2e:
+    PYTORCH_ENABLE_MPS_FALLBACK=1 uv run python scripts/test_e2e.py
+
 # Run tests with coverage.
 test-cov:
     uv run pytest --cov=ai_speech_shadowing --cov-report=term-missing

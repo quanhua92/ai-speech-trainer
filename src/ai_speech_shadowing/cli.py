@@ -519,3 +519,21 @@ def report_cmd(
         typer.echo(json.dumps(data, indent=2, ensure_ascii=False))
     else:
         typer.echo(format_summary(data))
+
+
+@app.command("serve")
+def serve_cmd(
+    host: Annotated[str, typer.Option("--host", help="Bind host.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", help="Bind port.")] = 8000,
+    reload: Annotated[bool, typer.Option("--reload", help="Auto-reload on code changes.")] = False,
+) -> None:
+    """Serve the REST API (FastAPI + uvicorn) at /api/v1."""
+    import uvicorn
+
+    typer.echo(f"Serving API on http://{host}:{port}/api/v1  (docs at /docs)")
+    uvicorn.run(
+        "ai_speech_shadowing.api.app:app",
+        host=host,
+        port=port,
+        reload=reload,
+    )

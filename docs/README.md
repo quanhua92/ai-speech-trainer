@@ -361,18 +361,22 @@ graph TD
 
 This phase is split into two parallel tracks:
 
-#### 8A — FastAPI Backend
+#### 8A — FastAPI Backend ✅
 
-- [ ] Set up FastAPI app with `uvicorn` server
-- [ ] Implement REST endpoints (see [REST API Specification](#-rest-api-specification) below)
-- [ ] Add multipart file upload for audio (WAV/WebM/MP3)
-- [ ] Add request validation with Pydantic models
-- [ ] Implement async evaluation pipeline for non-blocking requests
-- [ ] Add CORS middleware for local frontend dev
-- [ ] Add OpenAPI docs auto-generation (`/docs`, `/redoc`)
-- [ ] Write API integration tests with `httpx` / `TestClient`
+> **Done** — see [`rest-api.md`](rest-api.md) for the full API reference. Includes `scripts/test_e2e.py` exercising the whole flow over real HTTP.
 
-#### 8B — TanStack Start Frontend (`web/`)
+- [x] Set up FastAPI app with `uvicorn` server
+- [x] Implement REST endpoints (see [REST API Specification](#-rest-api-specification) below)
+- [x] Add multipart file upload for audio (WAV/WebM/MP3)
+- [x] Add request validation with Pydantic models
+- [x] Implement async evaluation pipeline for non-blocking requests  *(sync `def` handlers run in FastAPI's threadpool)*
+- [x] Add CORS middleware for local frontend dev
+- [x] Add OpenAPI docs auto-generation (`/docs`, `/redoc`)
+- [x] Write API integration tests with `httpx` / `TestClient`  *(+ `scripts/test_e2e.py` over real HTTP)*
+
+#### 8B — TanStack Start Frontend (`web/`) ⏸ Deferred
+
+> Deferred to a later phase. The 8A API above is the complete, stable contract any frontend (or third-party client) can build against.
 
 - [ ] Initialize TanStack Start (React + Vinxi) project in `web/` directory
 - [ ] Features:
