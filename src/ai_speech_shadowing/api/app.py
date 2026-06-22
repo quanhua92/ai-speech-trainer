@@ -37,7 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(evaluate.router, prefix="/api/v1")
     app.include_router(reference.router, prefix="/api/v1")
     app.include_router(history.router, prefix="/api/v1")
-    app.include_router(demo.router)  # /demo at root — not an API resource
+    app.include_router(demo.router)  # "/" — the demo page, not an API resource
     return app
 
 

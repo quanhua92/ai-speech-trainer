@@ -34,7 +34,7 @@ def client(tmp_path: Path) -> TestClient:
 # --------------------------------------------------------------------------- #
 class TestDemo:
     def test_demo_serves_html(self, client: TestClient) -> None:
-        r = client.get("/demo")
+        r = client.get("/")
         assert r.status_code == 200
         assert "text/html" in r.headers["content-type"]
         assert "ai-speech-shadowing" in r.text
@@ -83,7 +83,7 @@ class TestHistory:
         body = r.json()
         assert body["total"] == 0
         assert body["items"] == []
-        assert body["limit"] == 50
+        assert body["limit"] == 100
         assert body["offset"] == 0
 
     def test_list_pagination(self, client: TestClient) -> None:

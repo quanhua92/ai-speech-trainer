@@ -61,7 +61,8 @@
   .ph.ins { color: var(--ins); border-color: var(--ins); }
   ul.feedback { margin: 6px 0 0; padding-left: 18px; }
   ul.feedback li { margin: 3px 0; }
-  .hist { cursor: pointer; padding: 8px 10px; border-radius: 6px; }
+  .hist { cursor: pointer; padding: 8px 10px; border-radius: 6px; display: flex; align-items: center; gap: 8px; }
+  .hist .grow { margin-left: auto; }
   .hist:hover { background: var(--panel-2); }
   .hist .id { font-family: ui-monospace, monospace; font-size: 12px; }
   .err { color: var(--bad); }
@@ -86,13 +87,12 @@
   <section>
     <h2>1 · Reference (native target)</h2>
     <div class="row">
-      <input type="text" id="ref-text" placeholder="Type a sentence to synthesize…" value="The quick brown fox jumps over the lazy dog." />
+      <input type="text" id="ref-text" placeholder="Type a sentence to synthesize…" />
       <button onclick="createReference()">Generate</button>
       <button class="ghost" onclick="loadReferences()">Refresh</button>
     </div>
     <div class="row" style="margin-top:10px">
-      <select id="ref-select"><option value="">— existing references —</option></select>
-      <button class="ghost" onclick="playSelectedReference()">Listen</button>
+      <select id="ref-select" onchange="playSelectedReference()"><option value="">— existing references —</option></select>
     </div>
     <audio id="ref-audio" controls></audio>
   </section>
@@ -111,13 +111,9 @@
   <section>
     <h2>3 · Evaluate</h2>
     <div class="row">
-      <select id="eval-ref"><option value="">— choose reference —</option></select>
       <button onclick="runEvaluate()" id="eval-btn">Evaluate</button>
-      <span class="muted small">or</span>
-      <input type="text" id="quick-text" placeholder="quick-eval text" style="min-width:160px" />
-      <button class="ghost" onclick="runQuickEvaluate()">Quick evaluate</button>
+      <span id="eval-status" class="muted small"></span>
     </div>
-    <div id="eval-status" class="muted small" style="margin-top:8px"></div>
   </section>
 
   <section id="results" style="display:none">
@@ -145,8 +141,32 @@ let media = { ctx: null, stream: null, source: null, proc: null, frames: [], rat
 
 /* ---------- helpers ---------- */
 async function jget(url) { const r = await fetch(url); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json(); }
+// Load a URL into an <audio> element with full console logging + error capture.
+// Sets the src so the ▶ button works, but does NOT autoplay.
+function setAudio(elId, url, label) {
+  const el = document.getElementById(elId);
+  if (!el) { console.error("[audio] no element", elId); return; }
+  console.log(`[audio] ${label} ->`, url);
+  el.onerror = () => console.error(`[audio] ${label} LOAD ERROR`, url, el.error);
+  el.onloadstart = () => console.log(`[audio] ${label} loading…`);
+  el.oncanplay = () => console.log(`[audio] ${label} ready (duration ${el.duration}s)`);
+  el.src = url;
+  el.pause();
+  el.currentTime = 0;
+  return el;
+}
 async function jpost(url, body) {
-  const r = await fetch(url, body ? { method: "POST", body } : { method: "POST" });
+  const opts = { method: "POST" };
+  if (body != null) {
+    if (typeof body === "string") {
+      // JSON body — must declare it so FastAPI parses the Pydantic model.
+      opts.body = body;
+      opts.headers = { "Content-Type": "application/json" };
+    } else {
+      opts.body = body;  // FormData — the browser sets its own multipart content-type.
+    }
+  }
+  const r = await fetch(url, opts);
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
 }
@@ -173,7 +193,13 @@ async function loadReferences() {
     const refs = await jget(`${API}/references`);
     const opts = refs.map(r => `<option value="${r.id}">${r.id} — "${r.text.slice(0,40)}" (${r.duration_seconds}s)</option>`);
     document.getElementById("ref-select").innerHTML = `<option value="">— existing references —</option>` + opts.join("");
-    document.getElementById("eval-ref").innerHTML = `<option value="">— choose reference —</option>` + opts.join("");
+    // default the select to the first reference so Evaluate has a target.
+    if (refs.length) {
+      const preferred = "how-are-you-doing-today";
+      const id = refs.some(r => r.id === preferred) ? preferred : refs[0].id;
+      document.getElementById("ref-select").value = id;
+      setAudio("ref-audio", `${API}/references/${id}/audio`, "reference(load)");
+    }
   } catch (e) { console.error(e); }
 }
 async function createReference() {
@@ -181,15 +207,21 @@ async function createReference() {
   if (!text) return;
   const btn = event.target; btn.disabled = true; btn.textContent = "Generating…";
   try {
-    await jpost(`${API}/references`, JSON.stringify({ text, language: "en", speaker: "default" }));
+    const ref = await jpost(`${API}/references`, JSON.stringify({ text, language: "en", speaker: "default" }));
+    console.log("[createReference] response:", ref);
     await loadReferences();
+    // auto-select the new reference and load its audio for listening.
+    document.getElementById("ref-select").value = ref.id;
+    setAudio("ref-audio", `${API}/references/${ref.id}/audio`, "reference(gen)");
     refreshHealth();
   } catch (e) { alert("Failed: " + e.message); }
   btn.disabled = false; btn.textContent = "Generate";
 }
 function playSelectedReference() {
   const id = document.getElementById("ref-select").value;
-  if (id) document.getElementById("ref-audio").src = `${API}/references/${id}/audio`;
+  console.log("[playSelectedReference] id:", id);
+  if (!id) return;
+  setAudio("ref-audio", `${API}/references/${id}/audio`, "reference(select)");
 }
 
 /* ---------- recording (Web Audio → 16-bit PCM WAV) ---------- */
@@ -198,6 +230,10 @@ async function toggleRecording() {
   return stopRecording();
 }
 async function startRecording() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert("Microphone needs a secure context.\nUse http://localhost:8000 or serve over HTTPS — http://<lan-ip> is blocked by the browser.");
+    return;
+  }
   try {
     media.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
   } catch (e) { alert("Microphone access denied: " + e.message); return; }
@@ -261,21 +297,12 @@ function requireAudio() {
 }
 async function runEvaluate() {
   if (!requireAudio()) return;
-  const refId = document.getElementById("eval-ref").value;
-  if (!refId) { alert("Choose a reference first."); return; }
+  const refId = document.getElementById("ref-select").value;
+  if (!refId) { alert("Choose or generate a reference first."); return; }
   const fd = new FormData();
   fd.append("audio", userBlob, "attempt.wav");
   fd.append("reference_id", refId);
   await runEval(() => jpost(`${API}/evaluate`, fd));
-}
-async function runQuickEvaluate() {
-  if (!requireAudio()) return;
-  const text = document.getElementById("quick-text").value.trim();
-  if (!text) { alert("Enter quick-eval text first."); return; }
-  const fd = new FormData();
-  fd.append("audio", userBlob, "attempt.wav");
-  fd.append("text", text); fd.append("language", "en");
-  await runEval(() => jpost(`${API}/evaluate/quick`, fd));
 }
 async function runEval(fn) {
   const st = document.getElementById("eval-status");
@@ -329,28 +356,56 @@ function renderResults(res) {
 /* ---------- history ---------- */
 async function loadHistory() {
   try {
-    const h = await jget(`${API}/history?limit=20`);
+    const h = await jget(`${API}/history?limit=100`);
     const el = document.getElementById("history-list");
     if (!h.items.length) { el.innerHTML = `<div class="muted small">No evaluations yet.</div>`; return; }
     el.innerHTML = h.items.map(it =>
       `<div class="hist" onclick="viewHistory('${it.id}')">
          <span class="id">${it.id}</span>
-         <span class="${gradeClass(it.composite_grade)}" style="margin-left:8px">${it.composite_score}/100 ${it.composite_grade}</span>
-         <span class="muted small" style="margin-left:8px">${it.created_at}</span>
+         <span class="${gradeClass(it.composite_grade)}">${it.composite_score}/100 ${it.composite_grade}</span>
+         <span class="muted small">${it.created_at}</span>
+         <button class="danger grow" onclick="event.stopPropagation(); deleteHistory('${it.id}')">Delete</button>
        </div>`).join("");
   } catch (e) { console.error(e); }
+}
+
+async function deleteHistory(id) {
+  if (!confirm(`Delete evaluation ${id}? This removes the report and its attempt audio.`)) return;
+  try {
+    const r = await fetch(`${API}/history/${id}`, { method: "DELETE" });
+    if (!r.ok && r.status !== 204) throw new Error(`${r.status} ${await r.text()}`);
+    loadHistory();
+  } catch (e) { alert("Delete failed: " + e.message); }
 }
 async function viewHistory(id) {
   try {
     const data = await jget(`${API}/history/${id}`);
+    // Saved reports carry `composite` at the top level (not inside scores) and
+    // may include `words` — normalize to the shape renderResults expects.
     renderResults({
-      id: data.id, scores: data.scores, phoneme_diff: data.phoneme_diff, feedback: data.feedback
+      id: data.id,
+      scores: { ...data.scores, composite: data.composite },
+      phoneme_diff: data.phoneme_diff || [],
+      words: data.words || [],
+      feedback: data.feedback || [],
     });
-    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+    // Reload the reference + attempt audio that this evaluation was against.
+    console.log("[viewHistory] record:", data);
+    const rid = data.reference_id;
+    if (rid) {
+      const sel = document.getElementById("ref-select");
+      if ([...sel.options].some(o => o.value === rid)) sel.value = rid;
+      setAudio("ref-audio", `${API}/references/${rid}/audio`, "reference(history)");
+    }
+    if (data.audio_url) {
+      setAudio("user-audio", data.audio_url, "attempt(history)");
+      document.getElementById("user-info").textContent = "attempt from this evaluation";
+    }
   } catch (e) { alert(e.message); }
 }
 
 /* ---------- init ---------- */
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 refreshHealth(); loadReferences(); loadHistory();
 </script>
 </body>

@@ -533,14 +533,27 @@ def serve_cmd(
     host: Annotated[str, typer.Option("--host", help="Bind host.")] = "127.0.0.1",
     port: Annotated[int, typer.Option("--port", help="Bind port.")] = 8000,
     reload: Annotated[bool, typer.Option("--reload", help="Auto-reload on code changes.")] = False,
+    ssl_certfile: Annotated[
+        Path | None,
+        typer.Option(
+            "--ssl-certfile",
+            help="TLS cert (enables HTTPS — needed for the mic from non-localhost).",
+        ),
+    ] = None,
+    ssl_keyfile: Annotated[
+        Path | None, typer.Option("--ssl-keyfile", help="TLS private key.")
+    ] = None,
 ) -> None:
     """Serve the REST API (FastAPI + uvicorn) at /api/v1."""
     import uvicorn
 
-    typer.echo(f"Serving API on http://{host}:{port}/api/v1  (docs at /docs)")
+    scheme = "https" if ssl_certfile else "http"
+    typer.echo(f"Serving API on {scheme}://{host}:{port}/api/v1  (docs at /docs)")
     uvicorn.run(
         "ai_speech_shadowing.api.app:app",
         host=host,
         port=port,
         reload=reload,
+        ssl_certfile=str(ssl_certfile) if ssl_certfile else None,
+        ssl_keyfile=str(ssl_keyfile) if ssl_keyfile else None,
     )

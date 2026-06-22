@@ -374,9 +374,9 @@ This phase is split into two parallel tracks:
 - [x] Add OpenAPI docs auto-generation (`/docs`, `/redoc`)
 - [x] Write API integration tests with `httpx` / `TestClient`  *(+ `scripts/test_e2e.py` over real HTTP)*
 
-#### 8B — Single-page Demo (`GET /demo`) ✅
+#### 8B — Single-page Demo (`GET /`) ✅
 
-> **Done** — a self-contained `demo.html` served by the API at `GET /demo`
+> **Done** — a self-contained `demo.html` served by the API at `GET /`
 > (no build step, vanilla JS). Showcases **every** feature: mic record-to-WAV,
 > file upload, reference generation + playback, full + quick evaluation,
 > colour-coded phoneme diff, score cards, feedback, and history. The full
@@ -410,7 +410,7 @@ This phase is split into two parallel tracks:
 ### Phase 10 — Full Web UI (TanStack Start)
 
 > **Goal:** The production-grade React SPA (`web/`) for daily practice. Deferred from the
-> original Phase 8B; the lightweight `/demo` HTML already showcases every feature.
+> original Phase 8B; the lightweight `/` demo HTML already showcases every feature.
 > Details in `tmp/phase_10_web_ui.md`.
 
 ---

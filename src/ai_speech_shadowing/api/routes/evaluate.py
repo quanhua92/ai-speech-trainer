@@ -19,11 +19,11 @@ router = APIRouter(tags=["evaluate"])
 logger = logging.getLogger(__name__)
 
 
-def _decode_upload(upload: UploadFile) -> AudioSample:
-    """Read an UploadFile and decode it into an AudioSample (400 on failure)."""
+def _decode_upload(upload: UploadFile) -> tuple[AudioSample, bytes]:
+    """Read an UploadFile → (AudioSample, raw bytes). 400 on failure."""
     data = upload.file.read()
     try:
-        return AudioSample.from_bytes(data)
+        return AudioSample.from_bytes(data), data
     except AudioLoadError as e:
         raise HTTPException(status_code=400, detail=f"unreadable audio: {e}") from e
 
@@ -34,8 +34,9 @@ def _run_evaluation(
     user_audio: AudioSample,
     reference_id: str | None,
     reference_text: str | None = None,
+    attempt_bytes: bytes | None = None,
 ) -> EvaluationResponse:
-    """Preprocess both signals, evaluate, persist, and build the API response."""
+    """Preprocess both signals, evaluate, persist (report + attempt audio), respond."""
     state = get_state()
     extractor = state.phoneme_extractor()
     ref = preprocess(reference_audio)
@@ -43,8 +44,18 @@ def _run_evaluation(
     report = evaluate_pipeline(ref, hyp, phoneme_extractor=extractor, reference_text=reference_text)
 
     path = save_report(report, history_dir=state.history_dir)
+    eval_id = path.stem
     # stamp reference_id onto the saved report for history/stats
     _stamp_reference_id(path, reference_id)
+
+    # persist the user's attempt audio so history rows can replay it
+    audio_url: str | None = None
+    if attempt_bytes:
+        audio_path = state.history_dir / f"{eval_id}.wav"
+        audio_path.parent.mkdir(parents=True, exist_ok=True)
+        audio_path.write_bytes(attempt_bytes)
+        audio_url = f"/api/v1/history/{eval_id}/audio"
+        _stamp_field(path, "audio_url", audio_url)
 
     import json
 
@@ -52,22 +63,26 @@ def _run_evaluation(
     return build_evaluation_response(
         report,
         reference_id=reference_id,
-        eval_id=str(data.get("id", path.stem)),
+        eval_id=str(data.get("id", eval_id)),
         created_at=str(data.get("created_at", "")),
+        audio_url=audio_url,
     )
 
 
-def _stamp_reference_id(path, reference_id: str | None) -> None:
+def _stamp_field(path, field: str, value: object) -> None:
     import json
 
-    if reference_id is None:
-        return
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        data["reference_id"] = reference_id
+        data[field] = value
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     except (OSError, json.JSONDecodeError):
         pass
+
+
+def _stamp_reference_id(path, reference_id: str | None) -> None:
+    if reference_id is not None:
+        _stamp_field(path, "reference_id", reference_id)
 
 
 @router.post("/evaluate", response_model=EvaluationResponse)
@@ -85,7 +100,7 @@ def evaluate(
             detail=f"reference {reference_id!r} not found; POST /references first",
         )
     reference_audio = AudioSample.from_wav(ref_file)
-    user_audio = _decode_upload(audio)
+    user_audio, attempt_bytes = _decode_upload(audio)
     # pull the reference's source text for word-level highlighting
     reference_text = str(state.reference_manager.read_metadata(reference_id).get("text", ""))
     return _run_evaluation(
@@ -93,6 +108,7 @@ def evaluate(
         user_audio=user_audio,
         reference_id=reference_id,
         reference_text=reference_text or None,
+        attempt_bytes=attempt_bytes,
     )
 
 
@@ -111,7 +127,7 @@ def evaluate_quick(
     ref_path = state.reference_manager.generate(text, lang=lang_code)
     state.mark_tts_loaded(load_time_ms=int((time.perf_counter() - t0) * 1000))
     reference_audio = AudioSample.from_wav(ref_path)
-    user_audio = _decode_upload(audio)
+    user_audio, attempt_bytes = _decode_upload(audio)
     from ai_speech_shadowing.tts.generator import slugify
 
     return _run_evaluation(
@@ -119,4 +135,5 @@ def evaluate_quick(
         user_audio=user_audio,
         reference_id=slugify(text),
         reference_text=text,
+        attempt_bytes=attempt_bytes,
     )

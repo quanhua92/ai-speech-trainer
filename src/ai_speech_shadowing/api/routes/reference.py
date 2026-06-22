@@ -96,4 +96,8 @@ def get_reference_audio(slug: str) -> FileResponse:
     audio_file = state.reference_manager.audio_file(slug, profile)
     if not audio_file.is_file():
         raise HTTPException(status_code=404, detail=f"no audio for reference {slug!r}")
-    return FileResponse(path=str(audio_file), media_type="audio/wav", filename="ref.wav")
+    return FileResponse(
+        path=str(audio_file),
+        media_type="audio/wav",
+        content_disposition_type="inline",  # play in <audio>, don't download
+    )

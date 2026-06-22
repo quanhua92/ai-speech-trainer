@@ -32,6 +32,16 @@ test-slow:
 serve:
     uv run ai-speech-shadowing serve
 
+# Generate a self-signed TLS cert (needed for the mic from non-localhost devices).
+cert:
+    mkdir -p tmp && openssl req -x509 -newkey rsa:2048 -nodes \
+        -keyout tmp/key.pem -out tmp/cert.pem -days 365 -subj "/CN=localhost"
+
+# Serve over HTTPS on 0.0.0.0 (mic works from any LAN device). Run `just cert` first.
+serve-https:
+    uv run ai-speech-shadowing serve --host 0.0.0.0 --port 8000 \
+        --ssl-certfile tmp/cert.pem --ssl-keyfile tmp/key.pem
+
 # End-to-end REST API test (starts its own server, real Kokoro A-vs-B speech).
 e2e:
     PYTORCH_ENABLE_MPS_FALLBACK=1 uv run python scripts/test_e2e.py
@@ -40,7 +50,7 @@ e2e:
 compose-build:
     docker compose build
 
-# Build (if needed) and run the demo container. Open http://127.0.0.1:8000/demo.
+# Build (if needed) and run the demo container. Open http://127.0.0.1:8000/.
 compose-up:
     docker compose up --build
 

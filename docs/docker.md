@@ -7,7 +7,7 @@ references — as one image you can `docker-compose up`.
 
 ```bash
 docker compose up --build      # build (if needed) and run
-# → open http://127.0.0.1:8000/demo
+# → open http://127.0.0.1:8000/
 ```
 
 The first build installs dependencies (torch ~0.5 GB wheel included) and bakes

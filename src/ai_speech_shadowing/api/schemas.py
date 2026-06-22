@@ -87,6 +87,7 @@ class EvaluationResponse(BaseModel):
     phoneme_diff: list[PhonemeDiffItem]
     words: list[WordDiffItem] = []
     feedback: list[str]
+    audio_url: str | None = None
 
 
 def build_evaluation_response(
@@ -95,6 +96,7 @@ def build_evaluation_response(
     reference_id: str | None,
     eval_id: str,
     created_at: str,
+    audio_url: str | None = None,
 ) -> EvaluationResponse:
     """Adapt a FeedbackReport + envelope into the API EvaluationResponse."""
     return EvaluationResponse(
@@ -132,6 +134,7 @@ def build_evaluation_response(
             for w in report.words
         ],
         feedback=list(report.feedback),
+        audio_url=audio_url,
     )
 
 
