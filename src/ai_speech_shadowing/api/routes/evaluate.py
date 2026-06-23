@@ -150,7 +150,7 @@ def evaluate(
 @router.post("/evaluate/quick", response_model=EvaluationResponse)
 def evaluate_quick(
     audio: Annotated[UploadFile, File(description="User audio (WAV/WebM/MP3).")],
-    text: Annotated[str, Form(description="Target sentence in the target language.")],
+    text: Annotated[str, Form(min_length=1, max_length=500, description="Target sentence.")],
     language: Annotated[str, Form(description="Language code, e.g. 'en'.")] = "en",
 ) -> EvaluationResponse:
     """Evaluate user audio against a TTS reference generated on-the-fly."""

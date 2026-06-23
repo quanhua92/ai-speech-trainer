@@ -7,6 +7,7 @@ process.
 
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,13 +32,20 @@ class EngineState:
     extractor_load_time_ms: int | None = None
     tts_available: bool = False
     tts_load_time_ms: int | None = None
+    _extractor_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def phoneme_extractor(self) -> PhonemeExtractor:
-        """Lazily load the Wav2Vec2 phoneme model (once), recording load time."""
+        """Lazily load the Wav2Vec2 phoneme model (once), recording load time.
+
+        Double-checked locking: concurrent first-requests serialise on the lock
+        so the ~350 MB model is loaded exactly once per process.
+        """
         if self._extractor is None:
-            t0 = time.perf_counter()
-            self._extractor = get_extractor()
-            self.extractor_load_time_ms = int((time.perf_counter() - t0) * 1000)
+            with self._extractor_lock:
+                if self._extractor is None:
+                    t0 = time.perf_counter()
+                    self._extractor = get_extractor()
+                    self.extractor_load_time_ms = int((time.perf_counter() - t0) * 1000)
         return self._extractor
 
     def mark_tts_loaded(self, *, load_time_ms: int) -> None:

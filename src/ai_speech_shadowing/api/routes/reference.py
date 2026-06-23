@@ -97,6 +97,10 @@ def get_reference_audio(slug: str, voice: str | None = None) -> FileResponse:
     mgr = state.reference_manager
 
     if voice and voice != "default":
+        if voice[0] not in KOKORO_LANGUAGES:
+            raise HTTPException(
+                status_code=400, detail=f"unknown voice language prefix: {voice[0]!r}"
+            )
         profile = mgr.voice_profile(voice=voice)
         audio_file = mgr.audio_file(slug, profile)
         if not audio_file.is_file():

@@ -16,8 +16,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import threading
 import unicodedata
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -115,6 +118,9 @@ class ReferenceManager:
 
     def __init__(self, config: ReferenceConfig | None = None) -> None:
         self.config = config or ReferenceConfig()
+        # Serializes the read->modify->write in write_metadata so concurrent
+        # same-slug requests don't lose updates or corrupt metadata.json.
+        self._meta_lock = threading.Lock()
 
     # ---- naming & paths -------------------------------------------------
     def voice_profile(
@@ -188,31 +194,46 @@ class ReferenceManager:
     def write_metadata(self, slug: str, text: str, lang: str, voice: str) -> Path:
         """Merge this voice profile into ``<slug>/metadata.json`` (create if absent)."""
         path = self.metadata_path(slug)
-        data: dict[str, object] = {}
-        if path.is_file():
-            data = json.loads(path.read_text(encoding="utf-8"))
-        data.setdefault("text", text)
-        data.setdefault("language", KOKORO_LANGUAGES.get(lang, lang))
-        data.setdefault("default_speaker", voice)
-        data["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
-
-        profile = self.voice_profile(lang=lang, voice=voice)
-        audio_entry: dict[str, object] = {
-            "file": f"audio/{profile}/{DEFAULT_REF_FILENAME}",
-            "sample_rate": KOKORO_SAMPLE_RATE,
-            "engine": self.config.engine,
-        }
-        profiles = data.setdefault("audio", {})
-        if isinstance(profiles, dict):
-            profiles[profile] = audio_entry
-
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        # Lock the read-modify-write so concurrent same-slug writes don't lose
+        # updates, and write via a temp + atomic os.replace so a crash or
+        # concurrent reader never sees a half-written (corrupt) file.
+        with self._meta_lock:
+            data: dict[str, object] = {}
+            if path.is_file():
+                try:
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    data = {}  # treat a corrupt file as empty rather than crashing
+            data.setdefault("text", text)
+            data.setdefault("language", KOKORO_LANGUAGES.get(lang, lang))
+            data.setdefault("default_speaker", voice)
+            data["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+
+            profile = self.voice_profile(lang=lang, voice=voice)
+            audio_entry: dict[str, object] = {
+                "file": f"audio/{profile}/{DEFAULT_REF_FILENAME}",
+                "sample_rate": KOKORO_SAMPLE_RATE,
+                "engine": self.config.engine,
+            }
+            profiles = data.setdefault("audio", {})
+            if isinstance(profiles, dict):
+                profiles[profile] = audio_entry
+
+            tmp = path.with_name(path.name + ".tmp")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, path)
         return path
 
     def read_metadata(self, slug: str) -> dict[str, object]:
         path = self.metadata_path(slug)
-        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        if not path.is_file():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            # A corrupt metadata.json must not crash listing/get for all refs.
+            return {}
 
     def list_references(self) -> list[dict[str, object]]:
         """List every slug folder that has a metadata.json."""
@@ -223,6 +244,8 @@ class ReferenceManager:
         for entry in sorted(base.iterdir()):
             if entry.is_dir() and (entry / "metadata.json").is_file():
                 meta = self.read_metadata(entry.name)
+                if not meta:  # corrupt/unreadable metadata -> skip, don't crash the list
+                    continue
                 meta["slug"] = entry.name
                 results.append(meta)
         return results
@@ -253,12 +276,19 @@ class ReferenceManager:
             return out
 
         out.parent.mkdir(parents=True, exist_ok=True)
-        pipeline = KPipeline(lang_code=lang)
-        chunks = [audio for _gs, _ps, audio in pipeline(text, voice=voice)]
-        if not chunks:
-            raise RuntimeError(f"kokoro produced no audio for: {text!r}")
-        audio = np.concatenate(chunks) if len(chunks) > 1 else chunks[0]
-        sf.write(str(out), audio, KOKORO_SAMPLE_RATE)
+        try:
+            pipeline = KPipeline(lang_code=lang)
+            chunks = [audio for _gs, _ps, audio in pipeline(text, voice=voice)]
+            if not chunks:
+                raise RuntimeError(f"kokoro produced no audio for: {text!r}")
+            audio = np.concatenate(chunks) if len(chunks) > 1 else chunks[0]
+            sf.write(str(out), audio, KOKORO_SAMPLE_RATE)
+        except Exception:
+            # Don't leave an empty profile dir behind when synthesis fails
+            # (e.g. an invalid voice name passes the format check but Kokoro rejects it).
+            with suppress(OSError):
+                out.parent.rmdir()  # only succeeds if empty
+            raise
         self.write_metadata(slug, text, lang, voice)
         return out
 

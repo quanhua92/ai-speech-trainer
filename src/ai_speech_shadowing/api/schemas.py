@@ -142,7 +142,7 @@ def build_evaluation_response(
 # References
 # --------------------------------------------------------------------------- #
 class ReferenceCreateRequest(BaseModel):
-    text: str = Field(..., min_length=1)
+    text: str = Field(..., min_length=1, max_length=500)
     language: str = "en"
     speaker: str = "default"
 

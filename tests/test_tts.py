@@ -168,6 +168,36 @@ class TestMetadata:
 
 
 # --------------------------------------------------------------------------- #
+# Metadata resilience + atomic writes (run-2: corrupt file must not crash all)
+# --------------------------------------------------------------------------- #
+class TestMetadataResilience:
+    def test_read_metadata_corrupt_returns_empty(self, manager: ReferenceManager) -> None:
+        d = manager.config.base_dir / "bad-ref"
+        d.mkdir(parents=True)
+        (d / "metadata.json").write_text("{not valid json")
+        assert manager.read_metadata("bad-ref") == {}
+
+    def test_list_references_skips_corrupt_without_crashing(
+        self, manager: ReferenceManager
+    ) -> None:
+        manager.write_metadata("good", "Hello", "a", "af_heart")
+        bad = manager.config.base_dir / "bad"
+        bad.mkdir(parents=True)
+        (bad / "metadata.json").write_text("{not valid json")
+        listed = manager.list_references()  # must not raise
+        slugs = [m["slug"] for m in listed]
+        assert "good" in slugs
+
+    def test_write_metadata_is_atomic_round_trip(self, manager: ReferenceManager) -> None:
+        # write then re-read must always yield valid JSON, and a stale .tmp
+        # must not be left behind on success.
+        manager.write_metadata("hi", "Hello", "a", "af_heart")
+        meta = manager.read_metadata("hi")
+        assert meta["text"] == "Hello"
+        assert not (manager.config.base_dir / "hi" / "metadata.json.tmp").exists()
+
+
+# --------------------------------------------------------------------------- #
 # parse_sentence_list (pure)
 # --------------------------------------------------------------------------- #
 class TestParseSentenceList:

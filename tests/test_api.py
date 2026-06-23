@@ -265,6 +265,100 @@ class TestXssMitigation:
 
 
 # --------------------------------------------------------------------------- #
+# Run-2: CSRF guard, upload cap, text cap, voice-language validation
+# --------------------------------------------------------------------------- #
+class TestCsrfGuard:
+    """State-changing requests with a disallowed Origin are rejected (403);
+    no Origin (non-browser) and same-origin are allowed."""
+
+    def test_cross_origin_post_blocked(self, client: TestClient) -> None:
+        r = client.post("/api/v1/evaluate", headers={"Origin": "https://attacker.com"})
+        assert r.status_code == 403
+
+    def test_cross_origin_delete_blocked(self, client: TestClient) -> None:
+        r = client.delete("/api/v1/references/x", headers={"Origin": "https://attacker.com"})
+        assert r.status_code == 403
+
+    def test_no_origin_allowed_reaches_handler(self, client: TestClient) -> None:
+        # no Origin header -> not a browser CSRF -> reaches FastAPI validation (422)
+        r = client.post("/api/v1/evaluate")
+        assert r.status_code == 422
+
+    def test_configured_origin_allowed(self, client: TestClient) -> None:
+        # a configured dev origin reaches the handler (422, not 403)
+        r = client.post("/api/v1/evaluate", headers={"Origin": "http://localhost:5173"})
+        assert r.status_code == 422
+
+
+class TestUploadCap:
+    def test_oversized_upload_rejected_before_read(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ai_speech_shadowing.api import app as appmod
+
+        monkeypatch.setattr(appmod, "MAX_UPLOAD_BYTES", 16)
+        r = client.post(
+            "/api/v1/evaluate/quick",
+            files={"audio": ("a.wav", b"x" * 256, "audio/wav")},
+            data={"text": "hi"},
+        )
+        assert r.status_code == 413
+
+
+class TestTextCap:
+    def test_create_reference_rejects_oversized_text(self, client: TestClient) -> None:
+        r = client.post("/api/v1/references", json={"text": "x" * 501})
+        assert r.status_code == 422
+
+    def test_evaluate_quick_rejects_oversized_text(self, client: TestClient) -> None:
+        r = client.post(
+            "/api/v1/evaluate/quick",
+            files={"audio": ("a.wav", b"x", "audio/wav")},
+            data={"text": "x" * 501},
+        )
+        assert r.status_code == 422
+
+
+class TestVoiceLanguageValidation:
+    def test_unknown_voice_lang_returns_400(self, client: TestClient) -> None:
+        # 'x' is not a Kokoro language code; must be a clean 400, not a 500
+        r = client.get("/api/v1/references/anything/audio?voice=xs_foo")
+        assert r.status_code == 400
+
+
+class TestColdStartLock:
+    def test_phoneme_extractor_loads_once_under_concurrency(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import threading
+        import time
+        from unittest.mock import MagicMock
+
+        from ai_speech_shadowing.api import deps
+
+        state = deps.EngineState()
+        calls = 0
+        lock = threading.Lock()
+        mock_extractor = MagicMock(name="extractor")
+
+        def counting_get(*args, **kwargs):
+            nonlocal calls
+            with lock:
+                calls += 1
+            time.sleep(0.05)  # simulate a slow model load
+            return mock_extractor
+
+        monkeypatch.setattr(deps, "get_extractor", counting_get)
+        threads = [threading.Thread(target=state.phoneme_extractor) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert calls == 1  # double-checked locking -> exactly one load
+        assert state._extractor is mock_extractor
+
+
+# --------------------------------------------------------------------------- #
 # Full flow (opt-in slow: Kokoro + Wav2Vec2)
 # --------------------------------------------------------------------------- #
 @pytest.mark.slow
