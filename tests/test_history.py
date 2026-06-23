@@ -16,6 +16,7 @@ from ai_speech_shadowing.core.history import (
     format_summary,
     list_reports,
     load_report,
+    report_path,
     save_report,
 )
 from ai_speech_shadowing.core.phoneme import diff_phonemes
@@ -111,6 +112,33 @@ class TestDelete:
 
     def test_delete_missing(self, history_dir: Path) -> None:
         assert delete_report("eval_nope", history_dir) is False
+
+
+# --------------------------------------------------------------------------- #
+# Path safety — report_id traversal must be contained under history_dir
+# --------------------------------------------------------------------------- #
+class TestReportPathSafety:
+    """Regression tests: a report_id containing traversal must not read or
+    delete files outside the history (recordings) folder."""
+
+    @pytest.mark.parametrize("report_id", ["..", ".", "../secret", "..%2f..%2fetc", "a/../b"])
+    def test_report_path_rejects_traversal(self, history_dir: Path, report_id: str) -> None:
+        assert report_path(report_id, history_dir, suffix=".json") is None
+        assert report_path(report_id, history_dir, suffix=".wav") is None
+
+    def test_report_path_accepts_clean_id(self, history_dir: Path) -> None:
+        p = report_path("eval_abc12345", history_dir, suffix=".json")
+        assert p == history_dir / "eval_abc12345.json"
+
+    def test_load_traversal_returns_none(self, history_dir: Path) -> None:
+        assert load_report("..", history_dir) is None
+        assert load_report("../secret", history_dir) is None
+
+    def test_delete_traversal_returns_false_and_preserves_data(self, history_dir: Path) -> None:
+        path = save_report(_report(), history_dir=history_dir)
+        # attempt to delete via traversal must fail AND leave real data intact
+        assert delete_report("..", history_dir) is False
+        assert path.is_file()
 
 
 class TestFormatSummary:

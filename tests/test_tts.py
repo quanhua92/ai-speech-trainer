@@ -13,6 +13,7 @@ import soundfile as sf
 
 from ai_speech_shadowing.tts.generator import (
     KOKORO_SAMPLE_RATE,
+    PathEscapeError,
     ReferenceConfig,
     ReferenceManager,
     parse_sentence_list,
@@ -79,6 +80,57 @@ class TestReferenceManagerStructure:
         f.parent.mkdir(parents=True)
         f.write_bytes(b"x")
         assert manager.exists("hi") is True
+
+
+# --------------------------------------------------------------------------- #
+# Path safety — traversal payloads rejected at the manager (the sink)
+# --------------------------------------------------------------------------- #
+class TestPathSafety:
+    """Regression tests for the path-traversal fix.
+
+    Bare ".." / "." and slash-containing slugs are rejected by the slug format
+    check; a symlink whose name is a valid slug but points outside base_dir is
+    rejected by the resolve()+is_relative_to containment check.
+    """
+
+    @pytest.mark.parametrize("slug", ["..", ".", "foo/../bar", "%2e%2e", "a/b"])
+    def test_slug_path_rejects_traversal(self, manager: ReferenceManager, slug: str) -> None:
+        with pytest.raises(PathEscapeError):
+            manager.slug_path(slug)
+
+    def test_slug_path_accepts_clean_slug(self, manager: ReferenceManager) -> None:
+        # happy path is not broken by the guard
+        assert manager.slug_path("hello-world") == manager.config.base_dir / "hello-world"
+
+    def test_slug_path_rejects_symlink_escape(
+        self,
+        manager: ReferenceManager,
+        tmp_path_factory: pytest.TempPathFactory,
+    ) -> None:
+        # A symlink with a valid slug name pointing OUTSIDE base_dir must be
+        # caught by the containment check (the regex alone would let it through).
+        outside = tmp_path_factory.mktemp("outside")
+        manager.config.base_dir.mkdir(parents=True, exist_ok=True)
+        (manager.config.base_dir / "evil-link").symlink_to(outside, target_is_directory=True)
+        with pytest.raises(PathEscapeError):
+            manager.slug_path("evil-link")
+
+    @pytest.mark.parametrize(
+        "voice",
+        ["a/../../../../tmp/x", "../boom", "af_heart/..", "a b"],
+    )
+    def test_voice_profile_rejects_traversal(self, manager: ReferenceManager, voice: str) -> None:
+        with pytest.raises(PathEscapeError):
+            manager.voice_profile(voice=voice)
+
+    def test_empty_voice_falls_back_to_default(self, manager: ReferenceManager) -> None:
+        # falsy voice is not a traversal — it means "use the configured default"
+        assert manager.voice_profile(voice="") == "kokoro-en-us-af_heart"
+        assert manager.voice_profile(voice=None) == "kokoro-en-us-af_heart"
+
+    def test_voice_profile_accepts_clean_voice(self, manager: ReferenceManager) -> None:
+        assert manager.voice_profile(voice="af_heart") == "kokoro-en-us-af_heart"
+        assert manager.voice_profile(voice="jf_alpha") == "kokoro-en-us-jf_alpha"
 
 
 class TestMetadata:

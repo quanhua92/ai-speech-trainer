@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -24,9 +25,38 @@ DEFAULT_HISTORY_DIR: Path = Path("data/history")
 
 _SEVERITY: dict[str, str] = {"good": "🟢", "fair": "🟡", "needs_work": "🔴"}
 
+# Report ids are "eval_" + uuid hex; allow [A-Za-z0-9_-] so "..", ".", and any
+# "/"-containing traversal are rejected before path construction.
+_REPORT_ID_RE: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_-]+$")
+
 
 def _new_id() -> str:
     return "eval_" + uuid.uuid4().hex[:8]
+
+
+def report_path(
+    report_id: str,
+    history_dir: str | Path = DEFAULT_HISTORY_DIR,
+    *,
+    suffix: str,
+) -> Path | None:
+    """Return ``history_dir / f"{report_id}{suffix}"`` only if it is a well-formed
+    id AND stays inside ``history_dir`` after resolving ``..`` and symlinks;
+    otherwise ``None``.
+
+    The fixed ``.json``/``.wav`` suffix already blocks most traversal, but the
+    format check + resolve() containment are defense-in-depth for the
+    recordings/history folder.
+    """
+    if not _REPORT_ID_RE.match(report_id):
+        return None
+    base = Path(history_dir).resolve()
+    path = Path(history_dir) / f"{report_id}{suffix}"
+    try:
+        path.resolve().relative_to(base)
+    except ValueError:
+        return None
+    return path
 
 
 def save_report(
@@ -92,19 +122,19 @@ def load_report(
     history_dir: str | Path = DEFAULT_HISTORY_DIR,
 ) -> dict[str, object] | None:
     """Load one report dict by id, or None if it doesn't exist."""
-    path = Path(history_dir) / f"{report_id}.json"
-    if not path.is_file():
+    path = report_path(report_id, history_dir, suffix=".json")
+    if path is None or not path.is_file():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def delete_report(report_id: str, history_dir: str | Path = DEFAULT_HISTORY_DIR) -> bool:
     """Delete a report; return True if something was removed."""
-    path = Path(history_dir) / f"{report_id}.json"
-    if path.is_file():
-        path.unlink()
-        return True
-    return False
+    path = report_path(report_id, history_dir, suffix=".json")
+    if path is None or not path.is_file():
+        return False
+    path.unlink()
+    return True
 
 
 def compute_stats(

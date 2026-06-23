@@ -48,6 +48,35 @@ DEFAULT_BASE_DIR: Path = Path("data/references")
 DEFAULT_REF_FILENAME: str = "ref.wav"
 SLUG_MAX_LENGTH: int = 50
 
+# Kokoro voice names look like "af_heart", "am_michael", "bf_emma", "zf_xiaobei":
+# 1-2 letters, an underscore, then a word. This blocks "/", "\", "..", spaces,
+# and null bytes — the characters that make a voice name a path-traversal vector.
+_VOICE_RE: re.Pattern[str] = re.compile(r"^[A-Za-z]{1,2}_\w+$")
+
+# Slugs produced by slugify() are [a-z0-9-]. Enforcing the same shape on read/delete
+# rejects ".", "..", and any encoded traversal before path construction.
+_SLUG_RE: re.Pattern[str] = re.compile(r"^[a-z0-9-]+$")
+
+
+class PathEscapeError(ValueError):
+    """Raised when a user-supplied path segment would leave its base directory."""
+
+
+def ensure_within(base: Path, target: Path) -> Path:
+    """Resolve ``target`` and confirm it stays within ``base``.
+
+    Flattens ``..`` segments and follows symlinks to the real location, then
+    rejects anything that escapes ``base``. Returns the resolved path so callers
+    operate on the true on-disk location.
+    """
+    base_r = base.resolve()
+    target_r = target.resolve()
+    try:
+        target_r.relative_to(base_r)
+    except ValueError:
+        raise PathEscapeError(f"path {target!r} escapes base {base!r}") from None
+    return target_r
+
 
 def slugify(text: str, *, max_length: int = SLUG_MAX_LENGTH) -> str:
     """Derive a short filesystem-safe slug from arbitrary text.
@@ -103,6 +132,10 @@ class ReferenceManager:
         lang = lang or self.config.default_lang
         engine = engine or self.config.engine
         voice = voice or self.config.default_voice
+        # The voice becomes a filesystem folder name, so reject anything that is
+        # not a clean Kokoro voice id (blocks path traversal via ?voice= / speaker).
+        if not _VOICE_RE.match(voice):
+            raise PathEscapeError(f"invalid voice name: {voice!r}")
         iso = KOKORO_LANGUAGES.get(lang, lang)
         return f"{engine}-{iso}-{voice}"
 
@@ -129,7 +162,13 @@ class ReferenceManager:
         return profile
 
     def slug_path(self, slug: str) -> Path:
-        return self.config.base_dir / slug
+        # Reject non-slug values (".", "..", encoded traversal) up front, then
+        # confirm the resolved path stays inside base_dir (defeats symlinks too).
+        if not _SLUG_RE.match(slug):
+            raise PathEscapeError(f"invalid slug: {slug!r}")
+        path = self.config.base_dir / slug
+        ensure_within(self.config.base_dir, path)
+        return path
 
     def metadata_path(self, slug: str) -> Path:
         return self.slug_path(slug) / "metadata.json"

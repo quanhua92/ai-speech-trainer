@@ -5,11 +5,13 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from ai_speech_shadowing import __version__
 from ai_speech_shadowing.api.routes import demo, evaluate, health, history, reference
+from ai_speech_shadowing.tts.generator import PathEscapeError
 
 
 def create_app() -> FastAPI:
@@ -32,6 +34,13 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Path-traversal attempts (from slug / voice / speaker / report_id) surface
+    # as PathEscapeError deep in the manager; map them to a generic 400 so the
+    # response neither confirms nor leaks the target path.
+    @app.exception_handler(PathEscapeError)
+    async def _path_escape_handler(_request: Request, _exc: PathEscapeError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": "invalid path segment"})
 
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(evaluate.router, prefix="/api/v1")

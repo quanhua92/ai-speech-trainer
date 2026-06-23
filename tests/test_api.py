@@ -118,6 +118,62 @@ class TestValidation:
 
 
 # --------------------------------------------------------------------------- #
+# Path-traversal regression (HTTP layer)
+# --------------------------------------------------------------------------- #
+class TestPathTraversal:
+    """Regression tests for the path-traversal fix.
+
+    httpx/TestClient normalizes bare ".." out of the URL before it reaches the
+    app, so the encoded "%2e%2e" form is used to actually exercise the handler.
+    The critical invariant for every case: real data must survive.
+    """
+
+    @staticmethod
+    def _seed_reference(slug: str = "hello-world") -> Path:
+        """Plant a real reference dir under the configured base_dir."""
+        base = deps.get_state().reference_manager.config.base_dir
+        d = base / slug
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "metadata.json").write_text('{"text":"hi","default_speaker":"af_heart"}')
+        return d
+
+    def test_delete_encoded_dotdot_blocked_and_preserves_data(self, client: TestClient) -> None:
+        ref = self._seed_reference()
+        r = client.delete("/api/v1/references/%2e%2e")
+        assert r.status_code == 400
+        assert ref.exists()  # the real reference was NOT deleted
+
+    def test_get_encoded_dotdot_returns_400(self, client: TestClient) -> None:
+        r = client.get("/api/v1/references/%2e%2e")
+        assert r.status_code == 400
+
+    def test_get_audio_encoded_dotdot_returns_400(self, client: TestClient) -> None:
+        r = client.get("/api/v1/references/%2e%2e/audio")
+        assert r.status_code == 400
+
+    def test_voice_query_traversal_returns_400(self, client: TestClient) -> None:
+        # voice is validated before any Kokoro call, so no model is needed
+        r = client.get("/api/v1/references/anything/audio?voice=a/../../../../tmp/x")
+        assert r.status_code == 400
+
+    def test_history_traversal_blocked(self, client: TestClient) -> None:
+        # history containment returns 404 (not found), not 400
+        for path in [
+            "/api/v1/history/%2e%2e",
+            "/api/v1/history/%2e%2e/audio",
+        ]:
+            assert client.get(path).status_code == 404
+        assert client.delete("/api/v1/history/%2e%2e").status_code == 404
+
+    def test_legit_reference_still_works(self, client: TestClient) -> None:
+        """Happy path must not be broken by the guards."""
+        self._seed_reference("hello-world")
+        r = client.get("/api/v1/references/hello-world")
+        assert r.status_code == 200
+        assert r.json()["id"] == "hello-world"
+
+
+# --------------------------------------------------------------------------- #
 # Full flow (opt-in slow: Kokoro + Wav2Vec2)
 # --------------------------------------------------------------------------- #
 @pytest.mark.slow

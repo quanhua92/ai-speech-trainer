@@ -10,7 +10,13 @@ from ai_speech_shadowing.api.schemas import (
     StatsResponse,
     build_history_item,
 )
-from ai_speech_shadowing.core.history import compute_stats, delete_report, list_reports, load_report
+from ai_speech_shadowing.core.history import (
+    compute_stats,
+    delete_report,
+    list_reports,
+    load_report,
+    report_path,
+)
 
 router = APIRouter(prefix="/history", tags=["history"])
 
@@ -58,9 +64,9 @@ def delete_history(report_id: str) -> None:
     """Delete a saved evaluation (report JSON + any stored attempt audio)."""
     state = get_state()
     removed = delete_report(report_id, state.history_dir)
-    wav_path = state.history_dir / f"{report_id}.wav"
-    had_wav = wav_path.is_file()
-    if had_wav:
+    wav_path = report_path(report_id, state.history_dir, suffix=".wav")
+    had_wav = wav_path is not None and wav_path.is_file()
+    if had_wav and wav_path is not None:
         wav_path.unlink()
     if not removed and not had_wav:
         raise HTTPException(status_code=404, detail=f"report {report_id!r} not found")
@@ -72,8 +78,8 @@ def get_history_audio(report_id: str):
     from fastapi.responses import FileResponse
 
     state = get_state()
-    audio_path = state.history_dir / f"{report_id}.wav"
-    if not audio_path.is_file():
+    audio_path = report_path(report_id, state.history_dir, suffix=".wav")
+    if audio_path is None or not audio_path.is_file():
         raise HTTPException(status_code=404, detail=f"no attempt audio for {report_id!r}")
     return FileResponse(
         path=str(audio_path),
