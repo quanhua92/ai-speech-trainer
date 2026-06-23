@@ -249,6 +249,8 @@ def _parse_weights(raw: str) -> tuple[float, float, float]:
     parts = [float(x) for x in raw.split(",")]
     if len(parts) != 3:
         raise typer.BadParameter("expected three comma-separated values, e.g. '0.4,0.3,0.3'")
+    if sum(parts) == 0:
+        raise typer.BadParameter("at least one scoring weight must be non-zero")
     return parts[0], parts[1], parts[2]
 
 

@@ -326,6 +326,29 @@ class TestVoiceLanguageValidation:
         assert r.status_code == 400
 
 
+class TestScoringWeights:
+    """All-zero scoring weights are valid per the schema but meaningless; they
+    must be rejected with 400 before any model work (was an uncaught 500)."""
+
+    def test_all_zero_weights_returns_400(self, client: TestClient) -> None:
+        slug = _seed_reference_with_audio()
+        audio = _pcm_wav(16_000, 16_000)  # 1s of valid 16 kHz audio
+        r = client.post(
+            "/api/v1/evaluate",
+            files={"audio": ("a.wav", audio, "audio/wav")},
+            data={
+                "reference_id": slug,
+                "weight_pronunciation": 0,
+                "weight_intonation": 0,
+                "weight_fluency": 0,
+            },
+        )
+        assert r.status_code == 400
+        # non-zero weights still pass the guard; the full pipeline is exercised
+        # under --runslow by TestEvaluateFlow (not re-tested here — would load
+        # the model in the fast suite).
+
+
 class TestColdStartLock:
     def test_phoneme_extractor_loads_once_under_concurrency(
         self, monkeypatch: pytest.MonkeyPatch

@@ -132,7 +132,12 @@ def evaluate(
 
     # normalise weights to sum 1
     raw_w = (weight_pronunciation, weight_intonation, weight_fluency)
-    wsum = sum(raw_w) or 1.0
+    if sum(raw_w) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="at least one scoring weight must be non-zero",
+        )
+    wsum = sum(raw_w)
     weights = tuple(w / wsum for w in raw_w)
 
     return _run_evaluation(
