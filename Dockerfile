@@ -48,11 +48,12 @@ ENV HF_HOME=/models \
     PATH=/app/.venv/bin:$PATH
 
 # Runtime system libraries only (no compilers → smaller image):
-#   espeak-ng   — kokoro's misaki English OOD fallback
 #   libsndfile1 — soundfile WAV decode (wheel bundles it too)
 #   libgomp1    — torch's OpenMP runtime on linux
+# Note: espeak-ng is NOT needed — the espeakng-loader wheel (a misaki[en] dep)
+#   vendors libespeak-ng + espeak-ng-data for linux x86-64/arm64.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        espeak-ng libsndfile1 libgomp1 ca-certificates \
+        libsndfile1 libgomp1 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

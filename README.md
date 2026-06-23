@@ -16,8 +16,7 @@ For a head-to-head scoring comparison against ELSA Speak, see [`docs/elsa-compar
 ## Quick start
 
 ```bash
-brew install espeak-ng                 # kokoro English fallback dependency
-uv sync                                # create .venv and install deps
+uv sync                                # create .venv and install deps (espeak-ng is vendored)
 uv run ai-speech-shadowing serve       # API + demo on http://localhost:8000
 # or: bash scripts/serve.sh            # HTTPS (needed for mic on non-localhost)
 ```

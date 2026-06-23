@@ -37,5 +37,6 @@ cache (`~/.cache/huggingface`). Outputs default to `tmp/audio/` (gitignored).
 
 ### Requirements
 
-- `espeak-ng` on PATH (kokoro's English OOD fallback). Install with
-  `brew install espeak-ng` on macOS.
+No system packages needed — `uv sync` pulls in `espeakng-loader`, which
+vendors `libespeak-ng` (kokoro's English OOD fallback) for macOS, Linux,
+and Windows.
