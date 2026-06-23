@@ -174,6 +174,97 @@ class TestPathTraversal:
 
 
 # --------------------------------------------------------------------------- #
+# Upload safety — pathological audio rejected with 400, not 500
+# --------------------------------------------------------------------------- #
+def _pcm_wav(sample_rate: int, n_samples: int) -> bytes:
+    """A minimal 16-bit PCM mono WAV with an arbitrary (even hostile) sample rate."""
+    import struct
+
+    data = b"\x00\x00" * n_samples
+    return (
+        struct.pack(
+            "<4sI4s4sIHHIIHH4sI",
+            b"RIFF",
+            36 + len(data),
+            b"WAVE",
+            b"fmt ",
+            16,
+            1,
+            1,
+            sample_rate,
+            sample_rate * 2,
+            2,
+            16,
+            b"data",
+            len(data),
+        )
+        + data
+    )
+
+
+def _seed_reference_with_audio(slug: str = "ref-clip") -> str:
+    """Plant a reference dir with a valid 16 kHz reference WAV + metadata."""
+    import numpy as np
+    import soundfile as sf
+
+    mgr = deps.get_state().reference_manager
+    audio_dir = mgr.config.base_dir / slug / "audio" / "kokoro-en-us-af_heart"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    sr = 16000
+    tone = (0.5 * np.sin(2 * np.pi * 220 * np.arange(sr) / sr)).astype(np.float32)
+    sf.write(str(audio_dir / "ref.wav"), tone, sr)
+    (mgr.config.base_dir / slug / "metadata.json").write_text(
+        '{"text":"hi","default_speaker":"af_heart"}'
+    )
+    return slug
+
+
+class TestUploadSafety:
+    """Regression for the sample_rate=1 memory-amplification DoS: the upload is
+    rejected at decode time with HTTP 400 (not a 4 GB allocation / 500)."""
+
+    def test_evaluate_rejects_sample_rate_1_upload(self, client: TestClient) -> None:
+        slug = _seed_reference_with_audio()
+        # the original attack: 122 KB WAV declaring sample_rate=1, 64000 frames
+        attack = _pcm_wav(1, 64_000)
+        r = client.post(
+            "/api/v1/evaluate",
+            files={"audio": ("a.wav", attack, "audio/wav")},
+            data={"reference_id": slug},
+        )
+        assert r.status_code == 400
+        # 8 kHz (within range) is accepted at decode — covered by
+        # test_audio.py::TestAudioPlausibility; not re-tested here because the
+        # full /evaluate pipeline would load the Wav2Vec2 model.
+
+
+# --------------------------------------------------------------------------- #
+# Stored-XSS mitigation — server data is HTML-escaped before innerHTML
+# --------------------------------------------------------------------------- #
+class TestXssMitigation:
+    """The demo SPA must HTML-escape server-derived strings before inserting
+    them into innerHTML. Guards the stored-XSS fix (reference text -> word-diff)."""
+
+    def test_demo_defines_esc_helper(self, client: TestClient) -> None:
+        html = client.get("/").text
+        assert "function esc(" in html
+
+    def test_word_diff_sink_is_escaped(self, client: TestClient) -> None:
+        html = client.get("/").text
+        # the confirmed stored-XSS sink now escapes w.word
+        assert "${esc(w.word)}" in html
+        # feedback + phoneme sinks are escaped too
+        assert "${esc(f)}" in html
+        assert "${esc(op.phoneme)}" in html
+
+    def test_no_unescaped_server_sinks_remain(self, client: TestClient) -> None:
+        html = client.get("/").text
+        # the raw (pre-fix) sinks must be gone
+        assert "${w.word}" not in html
+        assert ">• ${f}<" not in html
+
+
+# --------------------------------------------------------------------------- #
 # Full flow (opt-in slow: Kokoro + Wav2Vec2)
 # --------------------------------------------------------------------------- #
 @pytest.mark.slow

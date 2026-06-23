@@ -24,6 +24,15 @@ if TYPE_CHECKING:
 TARGET_SAMPLE_RATE: int = 16000
 """The canonical sample rate for all downstream ML models (Wav2Vec2, etc.)."""
 
+# Plausibility bounds used to reject pathological uploads before they reach the
+# DSP pipeline. A WAV declaring sample_rate=1 made librosa.resample allocate
+# len*16000/1 samples (~4 GB from a 122 KB upload); bounding the rate caps the
+# amplification at 16x, and the duration cap bounds downstream Wav2Vec2/MFCC
+# compute.
+MIN_SAMPLE_RATE: int = 1000
+MAX_SAMPLE_RATE: int = 192_000
+MAX_DURATION_SECONDS: float = 120.0
+
 PEAK_HEADROOM_DB: float = 0.0
 """Reserved headroom in dB for peak normalization (0 dBFS == 1.0 by default)."""
 
@@ -62,6 +71,17 @@ class AudioSample:
             raise ValueError("waveform must contain at least one sample")
         if self.sample_rate <= 0:
             raise ValueError(f"sample_rate must be positive; got {self.sample_rate}")
+        if not (MIN_SAMPLE_RATE <= self.sample_rate <= MAX_SAMPLE_RATE):
+            raise ValueError(
+                f"sample_rate {self.sample_rate} outside plausible range "
+                f"[{MIN_SAMPLE_RATE}, {MAX_SAMPLE_RATE}] Hz"
+            )
+        max_samples = int(self.sample_rate * MAX_DURATION_SECONDS)
+        if self.waveform.shape[0] > max_samples:
+            raise ValueError(
+                f"audio too long: {self.duration:.1f}s exceeds the "
+                f"{MAX_DURATION_SECONDS:.0f}s limit"
+            )
         object.__setattr__(self, "sample_rate", int(self.sample_rate))
 
     @property
@@ -105,7 +125,10 @@ class AudioSample:
             data, sr = sf.read(str(p), dtype="float32", always_2d=False)
         except RuntimeError as e:
             raise AudioLoadError(f"failed to decode {p}: {e}") from e
-        return cls(waveform=np.ascontiguousarray(data), sample_rate=int(sr))
+        try:
+            return cls(waveform=np.ascontiguousarray(data), sample_rate=int(sr))
+        except ValueError as e:
+            raise AudioLoadError(f"invalid audio in {p}: {e}") from e
 
     @classmethod
     def from_bytes(cls, data: bytes) -> AudioSample:
@@ -124,7 +147,10 @@ class AudioSample:
             raise AudioLoadError(f"failed to decode audio buffer: {e}") from e
         if sr <= 0 or arr.size == 0:
             raise AudioLoadError("invalid or empty audio buffer")
-        return cls(waveform=np.ascontiguousarray(arr), sample_rate=int(sr))
+        try:
+            return cls(waveform=np.ascontiguousarray(arr), sample_rate=int(sr))
+        except ValueError as e:
+            raise AudioLoadError(f"invalid audio: {e}") from e
 
     def to_wav(
         self,

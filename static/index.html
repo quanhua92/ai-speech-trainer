@@ -178,6 +178,15 @@ async function jpost(url, body) {
 }
 function setStatus(el, msg, isErr) { el.textContent = msg; el.className = isErr ? "text-bad text-xs" : "text-muted text-xs"; }
 function gradeClass(g) { return "g-" + (g || ""); }
+// HTML-escape server-derived strings before they reach innerHTML. Server data
+// (reference text -> word-diff, feedback, phoneme labels) must never be
+// interpreted as markup: a stored "<svg/onload=...>" reference would otherwise
+// execute in the trusted localhost origin.
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s == null ? "" : String(s);
+  return d.innerHTML;
+}
 
 /* ---------- voice / language ---------- */
 const VOICES = {
@@ -396,20 +405,20 @@ function renderResults(res) {
     ? res.words.map((w, j) => {
         const ratio = (j / res.words.length).toFixed(3);
         const target = w.status === "del" ? "ref-audio" : "user-audio";
-        return `<span class="ph ${w.status === "match" ? "match" : w.status}" title="click to play" onclick="seekAudio('${target}',${ratio})">${w.word}</span>`;
+        return `<span class="ph ${w.status === "match" ? "match" : w.status}" title="click to play" onclick="seekAudio('${target}',${ratio})">${esc(w.word)}</span>`;
       }).join(" ")
     : `<span class="text-muted text-sm">(needs reference text)</span>`;
 
   document.getElementById("phoneme-diff").innerHTML = res.phoneme_diff.map((op, i) => {
     const ratio = (i / res.phoneme_diff.length).toFixed(3);
     const target = op.type === "del" ? "ref-audio" : "user-audio";
-    if (op.type === "match") return `<span class="ph match" title="click to play" onclick="seekAudio('${target}',${ratio})">/${op.phoneme}/</span>`;
-    if (op.type === "sub")   return `<span class="ph sub" title="expected /${op.expected}/ — click to play" onclick="seekAudio('${target}',${ratio})">/${op.actual}/</span>`;
-    if (op.type === "del")   return `<span class="ph del" title="deleted — click to hear reference" onclick="seekAudio('${target}',${ratio})">/${op.expected}/</span>`;
-    return `<span class="ph ins" title="inserted — click to play" onclick="seekAudio('${target}',${ratio})">/${op.actual}/</span>`;
+    if (op.type === "match") return `<span class="ph match" title="click to play" onclick="seekAudio('${target}',${ratio})">/${esc(op.phoneme)}/</span>`;
+    if (op.type === "sub")   return `<span class="ph sub" title="expected — click to play" onclick="seekAudio('${target}',${ratio})">/${esc(op.actual)}/</span>`;
+    if (op.type === "del")   return `<span class="ph del" title="deleted — click to hear reference" onclick="seekAudio('${target}',${ratio})">/${esc(op.expected)}/</span>`;
+    return `<span class="ph ins" title="inserted — click to play" onclick="seekAudio('${target}',${ratio})">/${esc(op.actual)}/</span>`;
   }).join(" ") || `<span class="text-muted text-sm">(empty)</span>`;
 
-  document.getElementById("feedback").innerHTML = res.feedback.map(f => `<li class="my-0.5">• ${f}</li>`).join("") || `<li class="text-muted">none</li>`;
+  document.getElementById("feedback").innerHTML = res.feedback.map(f => `<li class="my-0.5">• ${esc(f)}</li>`).join("") || `<li class="text-muted">none</li>`;
 }
 
 /* ---------- history ---------- */
