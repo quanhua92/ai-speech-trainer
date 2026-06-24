@@ -99,6 +99,13 @@ class EvaluationResponse(BaseModel):
     clip without transcript). The "Phoneme alignment" view is correspondingly
     less authoritative in this mode.
     """
+    reference_phonemes: list[str] = []
+    """The reference phoneme sequence (the target pronunciation). Source is
+    recorded in ``reference_phoneme_source``. Useful for showing learners
+    "what you should have said" alongside the diff."""
+    user_phonemes: list[str] = []
+    """The user's phoneme sequence as decoded by Wav2Vec2 from their audio.
+    Useful for showing learners "what you actually said" alongside the diff."""
     words: list[WordDiffItem] = []
     feedback: list[str]
     audio_url: str | None = None
@@ -140,6 +147,8 @@ def build_evaluation_response(
         ),
         phoneme_diff=[PhonemeDiffItem(**_op_to_dict(op)) for op in report.phoneme_diff.operations],
         reference_phoneme_source=report.reference_phoneme_source,
+        reference_phonemes=list(report.phoneme_diff.reference),
+        user_phonemes=list(report.phoneme_diff.hypothesis),
         words=[
             WordDiffItem(
                 word=w.word,

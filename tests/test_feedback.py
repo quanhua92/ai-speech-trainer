@@ -332,3 +332,16 @@ class TestReferencePhonemeSource:
         )
         data = report_to_dict(report)
         assert data["reference_phoneme_source"] == "kokoro-g2p"
+
+    def test_report_to_dict_exposes_raw_phoneme_sequences(self) -> None:
+        # The raw reference + user sequences must be surfaced alongside the
+        # aligned diff ops, so clients can show "target" and "actual" without
+        # reconstructing them from the diff.
+        report = build_report(
+            diff_phonemes(["h", "ə", "l"], ["h", "ɐ", "l"]),
+            _prosody(1.0),
+            _fluency(1.0),
+        )
+        data = report_to_dict(report)
+        assert data["reference_phonemes"] == ["h", "ə", "l"]
+        assert data["user_phonemes"] == ["h", "ɐ", "l"]

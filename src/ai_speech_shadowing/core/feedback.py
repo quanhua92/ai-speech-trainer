@@ -391,6 +391,8 @@ def report_to_dict(report: FeedbackReport) -> dict[str, object]:
         },
         "phoneme_error_rate": round(report.phoneme_error_rate, 4),
         "reference_phoneme_source": report.reference_phoneme_source,
+        "reference_phonemes": list(report.phoneme_diff.reference),
+        "user_phonemes": list(report.phoneme_diff.hypothesis),
         "weights": list(report.weights),
         "phoneme_diff": [_op_to_dict(op) for op in report.phoneme_diff.operations],
         "words": [

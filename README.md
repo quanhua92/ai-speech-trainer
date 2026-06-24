@@ -13,6 +13,8 @@ For a head-to-head scoring comparison against ELSA Speak, see [`docs/elsa-compar
 
 [**▶ Watch the full walkthrough on YouTube**](https://youtu.be/ikQmdSpkKCg) — mic recording, reference generation, and multi-dimensional feedback (pronunciation, intonation, fluency).
 
+![Screenshot](screenshot.jpeg)
+
 ## Quick start
 
 ```bash
