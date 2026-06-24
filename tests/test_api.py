@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from ai_speech_shadowing.api import deps
 from ai_speech_shadowing.api.app import create_app
+from ai_speech_shadowing.core.feedback import FeedbackReport
 from ai_speech_shadowing.tts.generator import ReferenceConfig, ReferenceManager
 
 
@@ -347,6 +348,146 @@ class TestScoringWeights:
         # non-zero weights still pass the guard; the full pipeline is exercised
         # under --runslow by TestEvaluateFlow (not re-tested here — would load
         # the model in the fast suite).
+
+
+# --------------------------------------------------------------------------- #
+# Reference phoneme sourcing — G2P path vs acoustic fallback
+# --------------------------------------------------------------------------- #
+class TestReferencePhonemeSource:
+    """Verify the API wiring around the cached G2P phoneme block.
+
+    The full /evaluate flow needs the Wav2Vec2 model; here we exercise the
+    pure helpers that decide whether the G2P path applies for a given slug.
+    """
+
+    def test_read_phonemes_returns_none_when_block_absent(self, client: TestClient) -> None:
+        from ai_speech_shadowing.api.routes.evaluate import _read_reference_phonemes
+
+        _seed_reference_with_audio("plain-ref")  # metadata has no phonemes block
+        mgr = deps.get_state().reference_manager
+        assert _read_reference_phonemes(mgr, "plain-ref") is None
+
+    def test_read_phonemes_returns_none_when_slug_missing(self, client: TestClient) -> None:
+        from ai_speech_shadowing.api.routes.evaluate import _read_reference_phonemes
+
+        mgr = deps.get_state().reference_manager
+        assert _read_reference_phonemes(mgr, "never-existed") is None
+
+    def test_read_phonemes_returns_tokens_when_present(self, client: TestClient) -> None:
+        from ai_speech_shadowing.api.routes.evaluate import _read_reference_phonemes
+
+        mgr = deps.get_state().reference_manager
+        meta_path = mgr.config.base_dir / "g2p-ref" / "metadata.json"
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        meta_path.write_text(
+            '{"text":"hi","phonemes":{"tokens":["h","ə","l","oʊ"],'
+            '"source":"kokoro-g2p","notation":"espeak-wav2vec2"}}'
+        )
+        assert _read_reference_phonemes(mgr, "g2p-ref") == ["h", "ə", "l", "oʊ"]
+
+    def test_read_phonemes_returns_none_for_empty_tokens(self, client: TestClient) -> None:
+        from ai_speech_shadowing.api.routes.evaluate import _read_reference_phonemes
+
+        mgr = deps.get_state().reference_manager
+        meta_path = mgr.config.base_dir / "empty-ref" / "metadata.json"
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        meta_path.write_text('{"text":"hi","phonemes":{"tokens":[]}}')
+        # Empty token list is treated as "no G2P available" → acoustic fallback.
+        assert _read_reference_phonemes(mgr, "empty-ref") is None
+
+    def test_read_phonemes_tolerates_non_dict_block(self, client: TestClient) -> None:
+        from ai_speech_shadowing.api.routes.evaluate import _read_reference_phonemes
+
+        mgr = deps.get_state().reference_manager
+        meta_path = mgr.config.base_dir / "weird-ref" / "metadata.json"
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        # A corrupt phonemes block (a string instead of dict) must not crash.
+        meta_path.write_text('{"text":"hi","phonemes":"not-a-dict"}')
+        assert _read_reference_phonemes(mgr, "weird-ref") is None
+
+    def test_evaluation_response_carries_source_field(self) -> None:
+        # Build a synthetic report with the G2P source and verify the response
+        # schema surfaces it. Pure schema-level; no FastAPI client needed.
+        from ai_speech_shadowing.api.schemas import build_evaluation_response
+        from ai_speech_shadowing.core.feedback import (
+            DEFAULT_WEIGHTS,
+            FeedbackReport,
+            grade_for,
+        )
+        from ai_speech_shadowing.core.phoneme import diff_phonemes
+        from ai_speech_shadowing.core.prosody import PitchStats
+
+        def _stats() -> PitchStats:
+            return PitchStats(
+                f0_contour=__import__("numpy").zeros(1),
+                times=__import__("numpy").zeros(1),
+                mean_hz=200.0,
+                median_hz=200.0,
+                min_hz=100.0,
+                max_hz=300.0,
+                range_hz=200.0,
+                std_hz=20.0,
+                voiced_ratio=1.0,
+                pitch_floor=75.0,
+                pitch_ceiling=500.0,
+            )
+
+        report = FeedbackReport(
+            composite_score=90,
+            composite_grade=grade_for(90),
+            pronunciation_score=90,
+            intonation_score=90,
+            fluency_score=90,
+            weights=DEFAULT_WEIGHTS,
+            phoneme_error_rate=0.1,
+            pitch_range_ratio=1.0,
+            monotone=False,
+            dtw_normalized_distance=0.05,
+            syllable_rate_reference=2.0,
+            syllable_rate_hypothesis=2.0,
+            pause_count_reference=0,
+            pause_count_hypothesis=0,
+            phoneme_diff=diff_phonemes(["a"], ["a"]),
+            feedback=("ok",),
+            reference_phoneme_source="kokoro-g2p",
+        )
+        resp = build_evaluation_response(
+            report, reference_id="x", eval_id="eval_1", created_at="2026-01-01"
+        )
+        assert resp.reference_phoneme_source == "kokoro-g2p"
+
+        # The acoustic-source report also round-trips.
+        report2 = _seed_acoustic_report()
+        resp2 = build_evaluation_response(
+            report2, reference_id="y", eval_id="eval_2", created_at="2026-01-01"
+        )
+        assert resp2.reference_phoneme_source == "wav2vec2-acoustic"
+
+
+def _seed_acoustic_report() -> FeedbackReport:
+    """Reuse the construction above for the acoustic-source case."""
+    from ai_speech_shadowing.core.feedback import FeedbackReport, grade_for
+    from ai_speech_shadowing.core.phoneme import diff_phonemes
+
+    return FeedbackReport(
+        composite_score=50,
+        composite_grade=grade_for(50),
+        pronunciation_score=50,
+        intonation_score=50,
+        fluency_score=50,
+        weights=(0.4, 0.3, 0.3),
+        phoneme_error_rate=0.5,
+        pitch_range_ratio=0.5,
+        monotone=False,
+        dtw_normalized_distance=0.2,
+        syllable_rate_reference=2.0,
+        syllable_rate_hypothesis=2.0,
+        pause_count_reference=0,
+        pause_count_hypothesis=0,
+        phoneme_diff=diff_phonemes(["a"], ["b"]),
+        feedback=("ok",),
+        reference_phoneme_source="wav2vec2-acoustic",
+    )
 
 
 class TestColdStartLock:

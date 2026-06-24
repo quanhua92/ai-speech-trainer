@@ -252,3 +252,83 @@ class TestEvaluate:
         report = evaluate(ref, hyp)
         assert report.composite_score < 100
         assert len(report.feedback) > 0
+
+
+# --------------------------------------------------------------------------- #
+# Asymmetric phoneme sourcing (fast: uses a fake extractor, no model load)
+# --------------------------------------------------------------------------- #
+class _FakeExtractor:
+    """Records ``extract()`` calls; returns canned phonemes regardless of audio.
+
+    Mirrors the ``PhonemeExtractor`` shape used by :func:`evaluate` (which
+    accesses it duck-typed via the ``phoneme_extractor=`` parameter).
+    """
+
+    def __init__(self, phonemes: tuple[str, ...] = ("h", "ə", "l", "oʊ")) -> None:
+        from ai_speech_shadowing.core.phoneme import PhonemeResult
+
+        self._result = PhonemeResult(phonemes=phonemes, raw_text=" ".join(phonemes))
+        self.calls: list[AudioSample] = []
+
+    def extract(self, sample: AudioSample):  # type: ignore[no-untyped-def]
+        self.calls.append(sample)
+        return self._result
+
+
+class TestReferencePhonemeSource:
+    """Verify the G2P-vs-acoustic branch in :func:`evaluate`.
+
+    These tests run fast because they inject a fake extractor instead of loading
+    the 1.2 GB Wav2Vec2 model — the only thing under test is the branching
+    logic and the ``reference_phoneme_source`` stamp.
+    """
+
+    def test_g2p_path_skips_extractor_on_reference(
+        self, mono_44100_wav: Path, silent_wav: Path
+    ) -> None:
+        ref = preprocess(AudioSample.from_wav(mono_44100_wav))
+        hyp = preprocess(AudioSample.from_wav(silent_wav))
+        fake = _FakeExtractor()
+
+        report = evaluate(
+            ref,
+            hyp,
+            phoneme_extractor=fake,
+            reference_phonemes=["h", "ə", "l", "oʊ"],
+        )
+
+        # Only the hypothesis went through the acoustic recognizer.
+        assert len(fake.calls) == 1
+        assert fake.calls[0] is hyp
+        # The reference sequence came from the G2P input verbatim.
+        assert report.phoneme_diff.reference == ("h", "ə", "l", "oʊ")
+        assert report.reference_phoneme_source == "kokoro-g2p"
+
+    def test_acoustic_fallback_runs_extractor_on_both(
+        self, mono_44100_wav: Path, silent_wav: Path
+    ) -> None:
+        ref = preprocess(AudioSample.from_wav(mono_44100_wav))
+        hyp = preprocess(AudioSample.from_wav(silent_wav))
+        fake = _FakeExtractor()
+
+        report = evaluate(ref, hyp, phoneme_extractor=fake)  # no reference_phonemes
+
+        # Both sides went through the recognizer (legacy behavior).
+        assert len(fake.calls) == 2
+        assert report.reference_phoneme_source == "wav2vec2-acoustic"
+
+    def test_default_source_is_acoustic(self) -> None:
+        # A report built directly (not through evaluate) defaults to acoustic
+        # provenance, matching the legacy behavior before the G2P path existed.
+        report = build_report(diff_phonemes(["a"], ["a"]), _prosody(1.0), _fluency(1.0))
+        assert report.reference_phoneme_source == "wav2vec2-acoustic"
+
+    def test_report_to_dict_carries_source(self) -> None:
+        report = build_report(
+            diff_phonemes(["a"], ["a"]),
+            _prosody(1.0),
+            _fluency(1.0),
+            reference_phoneme_source="kokoro-g2p",
+        )
+        data = report_to_dict(report)
+        assert data["reference_phoneme_source"] == "kokoro-g2p"

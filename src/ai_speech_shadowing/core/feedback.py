@@ -16,12 +16,16 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ai_speech_shadowing.core.audio import AudioSample
 from ai_speech_shadowing.core.fluency import FluencyDiff
 from ai_speech_shadowing.core.phoneme import PhonemeDiff, PhonemeOp
 from ai_speech_shadowing.core.prosody import ProsodyDiff
 from ai_speech_shadowing.core.wordalign import WordDiff, word_level_diff
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 DEFAULT_WEIGHTS: tuple[float, float, float] = (0.4, 0.3, 0.3)
 """Composite weights for (pronunciation, intonation, fluency)."""
@@ -69,6 +73,13 @@ class FeedbackReport:
     phoneme_diff: PhonemeDiff
     feedback: tuple[str, ...]
     words: tuple[WordDiff, ...] = ()
+    reference_phoneme_source: str = "wav2vec2-acoustic"
+    """Provenance of the reference phoneme sequence.
+
+    One of: ``"kokoro-g2p"`` (captured from Kokoro at synthesis), 
+    ``"transcript-g2p"`` (misaki on a user-supplied transcript), or
+    ``"wav2vec2-acoustic"`` (the fallback when no text is available).
+    """
 
 
 def build_report(
@@ -79,6 +90,7 @@ def build_report(
     weights: tuple[float, float, float] = DEFAULT_WEIGHTS,
     reference_text: str | None = None,
     language: str = "en",
+    reference_phoneme_source: str = "wav2vec2-acoustic",
 ) -> FeedbackReport:
     """Combine the three pillar diffs into a FeedbackReport.
 
@@ -86,6 +98,10 @@ def build_report(
     sub-score; fluency = fluency sub-score. Each is in [0, 100]. The composite
     is the weighted sum. When ``reference_text`` is given, a best-effort
     word-level diff is attached (see :mod:`ai_speech_shadowing.core.wordalign`).
+
+    ``reference_phoneme_source`` records where the reference phoneme sequence
+    came from so the client/UI can render it honestly (G2P target vs. acoustic
+    recognition).
     """
     if not (0.99 <= sum(weights) <= 1.01):
         raise ValueError(f"weights must sum to ~1.0; got {sum(weights)}")
@@ -124,6 +140,7 @@ def build_report(
         phoneme_diff=phoneme_diff,
         feedback=tuple(feedback),
         words=words,
+        reference_phoneme_source=reference_phoneme_source,
     )
 
 
@@ -277,16 +294,41 @@ def evaluate(
     phoneme_extractor: object | None = None,
     weights: tuple[float, float, float] = DEFAULT_WEIGHTS,
     reference_text: str | None = None,
+    reference_phonemes: Sequence[str] | None = None,
     dtw_score_scale: float | None = None,
     feedback_language: str = "en",
 ) -> FeedbackReport:
-    """Run the full evaluation pipeline and return a FeedbackReport."""
+    """Run the full evaluation pipeline and return a FeedbackReport.
+
+    Phoneme sourcing is **asymmetric**:
+
+    - When ``reference_phonemes`` is provided (the canonical G2P target —
+      typically captured at TTS synthesis time and read from
+      ``metadata.json["phonemes"]["tokens"]``), it is used directly as the
+      reference sequence. No acoustic model is run on the reference audio, and
+      ``reference_phoneme_source`` is stamped ``"kokoro-g2p"``. This is the
+      correct path for any reference whose text is known a priori.
+    - When ``reference_phonemes`` is ``None`` (e.g. a future user-uploaded clip
+      without transcript), the reference phonemes are decoded acoustically via
+      the Wav2Vec2 model, and ``reference_phoneme_source`` is stamped
+      ``"wav2vec2-acoustic"``. This preserves the legacy behavior.
+
+    The hypothesis (user) side always goes through the acoustic recognizer —
+    that's the only way to hear what the user physically said.
+    """
     from ai_speech_shadowing.core.fluency import compare_fluency
     from ai_speech_shadowing.core.phoneme import diff_phonemes, get_extractor
     from ai_speech_shadowing.core.prosody import compare_pitch, extract_pitch
 
     extractor = phoneme_extractor or get_extractor()
-    ref_phonemes = extractor.extract(reference_sample).phonemes
+    if reference_phonemes is not None:
+        # G2P target path: skip acoustic recognition on the reference side.
+        ref_phonemes = tuple(reference_phonemes)
+        ref_source = "kokoro-g2p"
+    else:
+        # Acoustic fallback (no transcript / uploaded clip path).
+        ref_phonemes = extractor.extract(reference_sample).phonemes
+        ref_source = "wav2vec2-acoustic"
     hyp_phonemes = extractor.extract(hypothesis_sample).phonemes
     phoneme_diff = diff_phonemes(ref_phonemes, hyp_phonemes)
 
@@ -302,6 +344,7 @@ def evaluate(
         weights=weights,
         reference_text=reference_text,
         language=feedback_language,
+        reference_phoneme_source=ref_source,
     )
 
 
@@ -347,6 +390,7 @@ def report_to_dict(report: FeedbackReport) -> dict[str, object]:
             },
         },
         "phoneme_error_rate": round(report.phoneme_error_rate, 4),
+        "reference_phoneme_source": report.reference_phoneme_source,
         "weights": list(report.weights),
         "phoneme_diff": [_op_to_dict(op) for op in report.phoneme_diff.operations],
         "words": [

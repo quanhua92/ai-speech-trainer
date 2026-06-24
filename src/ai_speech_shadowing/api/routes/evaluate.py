@@ -34,6 +34,7 @@ def _run_evaluation(
     user_audio: AudioSample,
     reference_id: str | None,
     reference_text: str | None = None,
+    reference_phonemes: list[str] | None = None,
     attempt_bytes: bytes | None = None,
     weights: tuple[float, float, float] | None = None,
     dtw_score_scale: float | None = None,
@@ -51,6 +52,8 @@ def _run_evaluation(
         eval_kwargs["dtw_score_scale"] = dtw_score_scale
     if feedback_language and feedback_language != "en":
         eval_kwargs["feedback_language"] = feedback_language
+    if reference_phonemes is not None:
+        eval_kwargs["reference_phonemes"] = reference_phonemes
     report = evaluate_pipeline(
         ref,
         hyp,
@@ -101,6 +104,26 @@ def _stamp_reference_id(path, reference_id: str | None) -> None:
         _stamp_field(path, "reference_id", reference_id)
 
 
+def _read_reference_phonemes(manager, reference_id: str) -> list[str] | None:
+    """Read cached G2P phonemes for a reference slug, if present.
+
+    Returns ``None`` when the metadata is absent, the ``phonemes`` block was
+    never written (e.g. an uploaded clip without transcript), or the cached
+    tokens are empty. A ``None`` return triggers the acoustic fallback in
+    :func:`evaluate`.
+    """
+    meta = manager.read_metadata(reference_id)
+    if not meta:
+        return None
+    block = meta.get("phonemes")
+    if not isinstance(block, dict):
+        return None
+    tokens = block.get("tokens")
+    if not isinstance(tokens, list) or not tokens:
+        return None
+    return [str(t) for t in tokens]
+
+
 @router.post("/evaluate", response_model=EvaluationResponse)
 def evaluate(
     audio: Annotated[UploadFile, File(description="User audio (WAV/WebM/MP3).")],
@@ -129,6 +152,7 @@ def evaluate(
     reference_audio = AudioSample.from_wav(ref_file)
     user_audio, attempt_bytes = _decode_upload(audio)
     reference_text = str(state.reference_manager.read_metadata(reference_id).get("text", ""))
+    reference_phonemes = _read_reference_phonemes(state.reference_manager, reference_id)
 
     # normalise weights to sum 1
     raw_w = (weight_pronunciation, weight_intonation, weight_fluency)
@@ -145,6 +169,7 @@ def evaluate(
         user_audio=user_audio,
         reference_id=reference_id,
         reference_text=reference_text or None,
+        reference_phonemes=reference_phonemes,
         attempt_bytes=attempt_bytes,
         weights=weights,
         dtw_score_scale=dtw_scale,
@@ -170,10 +195,16 @@ def evaluate_quick(
     user_audio, attempt_bytes = _decode_upload(audio)
     from ai_speech_shadowing.tts.generator import slugify
 
+    slug = slugify(text)
+    # generate() captured Kokoro's G2P at synthesis time; reuse it as the
+    # reference phoneme source so we don't re-run Wav2Vec2 on the synthesized audio.
+    reference_phonemes = _read_reference_phonemes(state.reference_manager, slug)
+
     return _run_evaluation(
         reference_audio=reference_audio,
         user_audio=user_audio,
-        reference_id=slugify(text),
+        reference_id=slug,
         reference_text=text,
+        reference_phonemes=reference_phonemes,
         attempt_bytes=attempt_bytes,
     )

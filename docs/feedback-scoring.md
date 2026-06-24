@@ -89,6 +89,25 @@ report = evaluate(ref, hyp)  # loads the Wav2Vec2 phoneme model on first call
 `phoneme_extractor=` to inject a pre-loaded model, and `weights=` to override
 the composite weighting.
 
+### Asymmetric reference sourcing
+
+`evaluate` accepts an optional `reference_phonemes=` parameter. When provided
+(typically read from the reference's cached `metadata.json["phonemes"]["tokens"]`
+— captured from Kokoro's G2P at synthesis time, see
+[`tts-reference.md`](tts-reference.md)), the reference audio is **not** passed
+through the Wav2Vec2 model at all — the G2P tokens become the reference
+sequence directly. This is the canonical-target path: text-derived, voice-
+invariant, and free of recognizer noise.
+
+When `reference_phonemes` is `None` (legacy callers, or a future uploaded clip
+without transcript), `evaluate` falls back to decoding the reference audio
+acoustically — the original behavior.
+
+The chosen path is recorded on the report as `reference_phoneme_source`
+(`"kokoro-g2p"` or `"wav2vec2-acoustic"`) and surfaced through the API. See
+[`phoneme-extraction.md`](phoneme-extraction.md) for the full rationale and
+the calibration caveat.
+
 ### CLI
 
 ```bash
@@ -150,13 +169,16 @@ for sub, `expected` for del, `actual` for ins).
 
 ## Test coverage
 
-`tests/test_feedback.py` (20 fast + 2 slow):
+`tests/test_feedback.py` (24 fast + 2 slow):
 
 - **Fast (synthetic diffs):** perfect report → composite 100 / "good"; composite
   weighting math (40/30/30 default and custom); weights-validation error;
   PER→accuracy mapping; all six `grade_for` thresholds; per-pillar feedback
   messages (substitution, monotone, rhythm, pauses, rate drift); JSON
-  round-trip + phoneme-op serialization; terminal & markdown structure.
+  round-trip + phoneme-op serialization; terminal & markdown structure;
+  **reference phoneme source** (G2P path skips acoustic recognition on
+  reference, acoustic fallback runs on both, default is acoustic, source
+  propagates through `report_to_dict`).
 - **Slow (full `evaluate`):** identical Kokoro clip → composite ≥ 90 / "good"
   and all renderers consume the real report; two different clips → composite
   `< 100` with non-empty feedback.

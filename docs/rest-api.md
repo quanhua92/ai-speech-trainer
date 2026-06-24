@@ -134,9 +134,23 @@ Response (`EvaluationResponse`):
     {"type": "match", "phoneme": "h"},
     {"type": "sub",   "expected": "l", "actual": "ɹ"}
   ],
+  "reference_phoneme_source": "kokoro-g2p",
   "feedback": ["Phoneme /l/ was substituted with /ɹ/ — focus on tongue placement."]
 }
 ```
+
+`reference_phoneme_source` records the provenance of the reference phoneme
+sequence used for scoring:
+
+| Value | Meaning |
+| --- | --- |
+| `"kokoro-g2p"` | The reference was synthesized by Kokoro; the target phonemes were captured from Kokoro's G2P at synthesis time and read from `metadata.json`. This is the canonical-target path — the reference side skipped the Wav2Vec2 recognizer entirely. |
+| `"transcript-g2p"` | *(Reserved)* misaki G2P run on a user-supplied transcript for an uploaded clip. Future feature. |
+| `"wav2vec2-acoustic"` | No cached G2P was available (e.g. an uploaded clip without transcript), so the reference audio itself went through the acoustic recognizer. The "Phoneme alignment" view is correspondingly less authoritative in this mode. |
+
+The demo UI uses this field to label the alignment section: `(target)` for G2P
+sources, `(recognized)` for the acoustic fallback. See
+[`phoneme-extraction.md`](phoneme-extraction.md) for the full rationale.
 
 Every evaluation is persisted to the history store automatically.
 

@@ -85,6 +85,20 @@ class EvaluationResponse(BaseModel):
     reference_id: str | None
     scores: Scores
     phoneme_diff: list[PhonemeDiffItem]
+    reference_phoneme_source: str | None = None
+    """Provenance of the reference phoneme sequence.
+
+    ``"kokoro-g2p"``: captured from Kokoro's G2P at synthesis time (the
+    canonical target — text is known a priori).
+
+    ``"transcript-g2p"``: misaki G2P run on a user-supplied transcript for an
+    uploaded clip (future feature).
+
+    ``"wav2vec2-acoustic"``: the reference phonemes were themselves decoded by
+    the acoustic recognizer because no text was available (e.g. an uploaded
+    clip without transcript). The "Phoneme alignment" view is correspondingly
+    less authoritative in this mode.
+    """
     words: list[WordDiffItem] = []
     feedback: list[str]
     audio_url: str | None = None
@@ -125,6 +139,7 @@ def build_evaluation_response(
             composite=CompositeScore(score=report.composite_score, grade=report.composite_grade),
         ),
         phoneme_diff=[PhonemeDiffItem(**_op_to_dict(op)) for op in report.phoneme_diff.operations],
+        reference_phoneme_source=report.reference_phoneme_source,
         words=[
             WordDiffItem(
                 word=w.word,

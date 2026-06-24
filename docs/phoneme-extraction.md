@@ -10,13 +10,46 @@
 Two independent concerns live in `ai_speech_shadowing.core.phoneme`:
 
 1. **Extraction** — decode an `AudioSample` into a phoneme sequence using a
-   Wav2Vec2-CTC model trained on an espeak IPA vocabulary.
+   Wav2Vec2-CTC model trained on an espeak IPA vocabulary. Used for the **user**
+   side of every comparison and as a **fallback** for the reference side when no
+   transcript is available (e.g. an uploaded clip without text).
 2. **Comparison** — align a reference vs. hypothesis phoneme sequence with
    `difflib` to produce a structured diff (`PhonemeDiff`) and a numeric PER.
 
 The comparison half is pure Python (no model) and is unit-tested exhaustively.
 The extraction half loads a large transformer and is therefore lazy and
 opt-in for tests.
+
+### Asymmetric sourcing: reference vs. hypothesis
+
+Phoneme sourcing is **not symmetric** — that's the field-standard design for
+pronunciation assessment (SpeechRater / ELSA / GOP literature):
+
+| Side | Source | Why |
+| --- | --- | --- |
+| **Reference** (when text is known) | G2P from the known text — captured from Kokoro at synthesis time and cached in `metadata.json["phonemes"]` | The text is ground truth; no acoustic model can be more correct than the phoneme string the synthesizer was told to produce. Already sentence-level (handles context, weak forms, linking) because misaki is utterance-level, not per-word. |
+| **Reference** (when text is unknown) | Wav2Vec2 acoustic recognition — the fallback path | A future "upload your own .mp3" feature with no transcript has no G2P target; the recognizer is the only option. |
+| **Hypothesis** (always) | Wav2Vec2 acoustic recognition | Captures what the user physically said, including genuine connected-speech reductions and errors. |
+
+The branch lives in `feedback.py::evaluate`:
+
+```python
+if reference_phonemes is not None:
+    ref_phonemes = tuple(reference_phonemes)          # G2P target path
+    ref_source = "kokoro-g2p"
+else:
+    ref_phonemes = extractor.extract(reference_sample).phonemes  # acoustic fallback
+    ref_source = "wav2vec2-acoustic"
+```
+
+The provenance is recorded on the `FeedbackReport` as `reference_phoneme_source`
+and surfaced through the API (`EvaluationResponse.reference_phoneme_source`)
+and the demo UI (the "Phoneme alignment" heading flips between `(target)` and
+`(recognized)` accordingly).
+
+The shared G2P machinery (misaki normalization + espeak tokenization) lives in
+`ai_speech_shadowing.core.g2p`. See [`tts-reference.md`](tts-reference.md) for
+how Kokoro's per-chunk `_ps` output is captured at synthesis time.
 
 ## The model
 
@@ -31,7 +64,11 @@ opt-in for tests.
 > **Why this model and not Whisper?** Whisper is an ASR model that uses
 > language-model context to *guess* words, masking pronunciation errors. This
 > Wav2Vec2-CTC model reports the phonemes it actually heard at the sub-word
-> acoustic level — which is the entire point of a pronunciation coach.
+> acoustic level — which is the entire point of a pronunciation coach. This
+> rationale applies to the **user** side. The **reference** side (when text is
+> known) goes further still: it skips the recognizer entirely and uses the G2P
+> target captured from Kokoro, which is by definition the intended
+> pronunciation rather than a recognition of it.
 
 ### A note on the tokenizer
 
@@ -143,6 +180,28 @@ Lower is better. Edge cases:
 - **`difflib` over a custom Levenshtein.** `SequenceMatcher` gives aligned
   opcodes for free (needed for the structured diff), and its `autojunk=False`
   mode is exact for sequences this short.
+- **Asymmetric sourcing.** Reference phonemes come from G2P when the text is
+  known (the canonical target); only the user side pays the 1.2 GB inference
+  cost. The acoustic path stays as a fallback so uploaded clips without a
+  transcript still work.
+
+### Calibration caveat (PER pre- vs. post-cutover)
+
+Before the asymmetric sourcing shipped, *both* reference and hypothesis went
+through the same Wav2Vec2 recognizer. A perfect user mimic therefore scored
+~100% PER, because the recognizer made identical errors on both clips and the
+errors cancelled. With the reference side now sourced from G2P, that
+forgiving symmetry is gone — the reference is the canonical target, so any
+drift between (a) misaki's canonical form and (b) what the recognizer hears in
+the user's audio correctly registers as error.
+
+The new scoring is **more accurate** (the reference no longer contributes its
+own recognition noise to the baseline) but **not directly comparable** to
+scores recorded before the cutover. Saved history across the cutover is
+therefore invalid as a trend signal — old `eval_*.json` files carry the
+`reference_phoneme_source: "wav2vec2-acoustic"` stamp (or no stamp, for
+pre-cutover reports), which can be used to filter them out of any trend
+analysis.
 
 ## Test coverage
 
@@ -153,8 +212,15 @@ Lower is better. Edge cases:
   under `uv run pytest --runslow`. Generates a Kokoro native reference,
   preprocesses it, and asserts the decoded phonemes for "Hello world, this is
   a Kokoro TTS test." start with `/h/`.
+- `tests/test_g2p.py` — pure-string unit tests for `norm_misaki` and
+  `misaki_to_espeak_tokens` (stress stripping, affricate unfolding, diphthong
+  mapping, multi-char tokenization, mocked espeak vocab — no HF download).
+- `tests/test_feedback.py::TestReferencePhonemeSource` — fast tests using a
+  fake extractor: verifies the G2P path skips acoustic recognition on the
+  reference, the acoustic fallback runs on both sides, and the source stamp
+  propagates through `FeedbackReport` and `report_to_dict`.
 
 ```bash
-uv run pytest                           # fast unit tests (47, 2 slow skipped)
+uv run pytest                           # fast unit tests (50+, 2 slow skipped)
 uv run pytest --runslow tests/test_phoneme.py   # opt-in model tests (~15s)
 ```

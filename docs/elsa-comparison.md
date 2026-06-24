@@ -80,6 +80,15 @@ regardless of who is speaking.
 > **Measured with:** Meta's Wav2Vec2-CTC phoneme model + `difflib` sequence alignment.
 > See [`phoneme-extraction.md`](phoneme-extraction.md) for the full pipeline.
 
+> **Calibration note (pre- vs. post-cutover).** Earlier PER figures in this
+> document were recorded when *both* reference and hypothesis were decoded
+> acoustically by the Wav2Vec2 model. The reference side is now sourced from
+> Kokoro's G2P output when text is known (captured at synthesis time), which
+> removes the recognizer's own noise from the baseline. PERs measured after
+> the cutover are not directly comparable to the pre-cutover numbers — they
+> are typically slightly higher for the same audio because the baseline is no
+> longer forgiving the recognizer's own mistakes.
+
 ### Intonation / prosody
 
 | | ELSA Speak | ai-speech-shadowing |
