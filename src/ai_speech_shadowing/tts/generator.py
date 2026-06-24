@@ -3,13 +3,21 @@
 Layout (under the configured base directory, default ``data/references``)::
 
     <slug>/
-        metadata.json              # text, language, default_speaker, per-profile audio
+        metadata.json              # text, language, default_speaker, phonemes,
+                                  # per-profile audio
         audio/
             kokoro-en-us/ref.wav   # one folder per voice profile (engine + language)
 
 References are cached: re-generating the same text/voice is a no-op unless
 ``force=True``. Kokoro synthesis itself is opt-in slow (loads the model); the
 structure / metadata / cache logic is pure and unit-tested.
+
+At synthesis time Kokoro's per-chunk G2P phoneme output is captured (rather
+than re-derived later from the audio via the 1.2 GB Wav2Vec2 model), normalized
+onto the Wav2Vec2 espeak inventory via :mod:`ai_speech_shadowing.core.g2p`, and
+persisted to ``metadata.json["phonemes"]``. The cached tokens are the canonical
+target pronunciation — a pure function of the text, invariant under the voice
+that rendered the audio.
 """
 
 from __future__ import annotations
@@ -27,6 +35,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
+
+from ai_speech_shadowing.core.g2p import misaki_to_espeak_tokens
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -191,8 +201,21 @@ class ReferenceManager:
         return self.audio_file(slug, profile).is_file()
 
     # ---- metadata -------------------------------------------------------
-    def write_metadata(self, slug: str, text: str, lang: str, voice: str) -> Path:
-        """Merge this voice profile into ``<slug>/metadata.json`` (create if absent)."""
+    def write_metadata(
+        self,
+        slug: str,
+        text: str,
+        lang: str,
+        voice: str,
+        phonemes: Sequence[str] | None = None,
+    ) -> Path:
+        """Merge this voice profile into ``<slug>/metadata.json`` (create if absent).
+
+        ``phonemes`` (when provided) is merged in via ``setdefault``: the first
+        generation wins, since the canonical G2P pronunciation is a function of
+        the text, not the voice. Re-running with a different voice for the same
+        text therefore leaves the cached phonemes untouched.
+        """
         path = self.metadata_path(slug)
         path.parent.mkdir(parents=True, exist_ok=True)
         # Lock the read-modify-write so concurrent same-slug writes don't lose
@@ -208,6 +231,17 @@ class ReferenceManager:
             data.setdefault("text", text)
             data.setdefault("language", KOKORO_LANGUAGES.get(lang, lang))
             data.setdefault("default_speaker", voice)
+            if phonemes is not None:
+                # setdefault: G2P tokens are text-derived, so the first voice
+                # to generate establishes them and later voices reuse them.
+                data.setdefault(
+                    "phonemes",
+                    {
+                        "tokens": list(phonemes),
+                        "source": "kokoro-g2p",
+                        "notation": "espeak-wav2vec2",
+                    },
+                )
             data["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
 
             profile = self.voice_profile(lang=lang, voice=voice)
@@ -276,20 +310,31 @@ class ReferenceManager:
             return out
 
         out.parent.mkdir(parents=True, exist_ok=True)
+        phoneme_tokens: tuple[str, ...] = ()
         try:
             pipeline = KPipeline(lang_code=lang)
-            chunks = [audio for _gs, _ps, audio in pipeline(text, voice=voice)]
+            chunks: list[np.ndarray] = []
+            ps_parts: list[str] = []
+            for _gs, ps, audio in pipeline(text, voice=voice):
+                chunks.append(audio)
+                if ps:
+                    ps_parts.append(ps)
             if not chunks:
                 raise RuntimeError(f"kokoro produced no audio for: {text!r}")
             audio = np.concatenate(chunks) if len(chunks) > 1 else chunks[0]
             sf.write(str(out), audio, KOKORO_SAMPLE_RATE)
+            # Capture Kokoro's G2P output (the canonical target pronunciation)
+            # and normalize it onto the Wav2Vec2 espeak inventory so it can be
+            # used directly as the reference phoneme sequence at evaluation time.
+            if ps_parts:
+                phoneme_tokens = misaki_to_espeak_tokens(" ".join(ps_parts))
         except Exception:
             # Don't leave an empty profile dir behind when synthesis fails
             # (e.g. an invalid voice name passes the format check but Kokoro rejects it).
             with suppress(OSError):
                 out.parent.rmdir()  # only succeeds if empty
             raise
-        self.write_metadata(slug, text, lang, voice)
+        self.write_metadata(slug, text, lang, voice, phonemes=phoneme_tokens or None)
         return out
 
     def generate_batch(

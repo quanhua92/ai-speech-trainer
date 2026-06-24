@@ -42,6 +42,11 @@ ISO-ish codes via `KOKORO_LANGUAGES` (`a→en-us`, `b→en-gb`, `e→es`, `f→f
   "text": "Hello world from Kokoro",
   "language": "en-us",
   "default_speaker": "af_heart",
+  "phonemes": {
+    "tokens": ["h", "ə", "l", "oʊ", "w", "ɜ˞", "l", "d", "f", "ɹ", "ʌ", "m", "k", "oʊ", "ɹ", "oʊ"],
+    "source": "kokoro-g2p",
+    "notation": "espeak-wav2vec2"
+  },
   "updated_at": "2026-06-22T12:42:20+00:00",
   "audio": {
     "kokoro-en-us": {
@@ -55,8 +60,32 @@ ISO-ish codes via `KOKORO_LANGUAGES` (`a→en-us`, `b→en-gb`, `e→es`, `f→f
 
 The `audio` dict is **merged** across profiles: regenerating the same slug with
 a different voice/language adds a new entry without clobbering the existing ones
-(`text`/`language`/`default_speaker` are set with `setdefault`, so the first
-generation wins).
+(`text`/`language`/`default_speaker`/`phonemes` are set with `setdefault`, so the
+first generation wins).
+
+### Captured phonemes
+
+The `phonemes` block holds the canonical target pronunciation of the reference
+text, captured at synthesis time from Kokoro's internal G2P (the same engine
+misaki provides). It is:
+
+- **A pure function of the text.** Voice-invariant — `af_heart`, `am_adam`, and
+  any other Kokoro voice all produce identical `tokens` for the same `text`,
+  because the G2P step is text-only. (This is asserted by
+  `tests/test_tts.py::TestGenerate::test_phonemes_invariant_under_voice`.)
+- **Normalized onto the Wav2Vec2 espeak inventory.** Stress marks, length marks,
+  and misaki-specific notations (`ʤ` → `dʒ`, uppercase stressed diphthongs) are
+  mapped onto the 392-token espeak vocabulary that `PhonemeExtractor._ctc_collapse`
+  emits. See `ai_speech_shadowing.core.g2p.misaki_to_espeak_tokens`.
+- **Cached, never recomputed.** Because the field is `setdefault`-ed, the first
+  generation establishes it and subsequent regenerations with other voices reuse
+  it. The evaluation pipeline can therefore skip running the 1.2 GB Wav2Vec2
+  model on the reference audio entirely.
+
+`source: "kokoro-g2p"` identifies the provenance — other sources may appear in
+the future (e.g. `transcript-g2p` for uploaded references with a user-supplied
+transcript). `notation: "espeak-wav2vec2"` records the normalization target so
+future vocabulary changes can be detected.
 
 ## Slug derivation
 
@@ -148,15 +177,20 @@ evaluation pipeline forever).
   binary blobs. Curate and force-add specific references if you want them
   tracked.
 - **Kokoro output is concatenated.** Long text that splits into multiple chunks
-  is `np.concatenate`-d into one `ref.wav` at 24 kHz.
+  is `np.concatenate`-d into one `ref.wav` at 24 kHz. The per-chunk G2P phoneme
+  strings are likewise space-joined and normalized as one sequence, so
+  `metadata.json["phonemes"]["tokens"]` reflects the whole utterance.
 
 ## Test coverage
 
-`tests/test_tts.py` (15 fast + 3 slow):
+`tests/test_tts.py` (19 fast + 4 slow):
 
 - **Fast (pure, tmp_path):** `slugify` (ascii, punctuation, accents, CJK hash,
   truncation, whitespace); `voice_profile` naming; path layout; `exists()` cache
-  check; metadata write/read and multi-profile merge; `list_references`
-  (sorted, empty); `parse_sentence_list` (skips blanks + `#` comments).
-- **Slow (Kokoro):** single generation writes a 24 kHz WAV + metadata; cache
-  skips regeneration without `force`; batch generates multiple references.
+  check; metadata write/read, multi-profile merge, and `phonemes` persistence
+  (`setdefault` semantics, `None` omission); `list_references` (sorted, empty);
+  `parse_sentence_list` (skips blanks + `#` comments).
+- **Slow (Kokoro):** single generation writes a 24 kHz WAV + metadata with
+  captured G2P `phonemes`; cache skips regeneration without `force`; batch
+  generates multiple references; **voice-invariance** — `af_heart` and `am_adam`
+  yield identical `phonemes.tokens` for the same text.

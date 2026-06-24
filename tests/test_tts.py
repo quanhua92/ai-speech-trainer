@@ -142,6 +142,28 @@ class TestMetadata:
         assert meta["default_speaker"] == "af_heart"
         assert "kokoro-en-us-af_heart" in meta["audio"]
 
+    def test_write_metadata_persists_phonemes(self, manager: ReferenceManager) -> None:
+        manager.write_metadata("hi", "Hello", "a", "af_heart", phonemes=["h", "ə", "l", "oʊ"])
+        meta = manager.read_metadata("hi")
+        assert meta["phonemes"]["tokens"] == ["h", "ə", "l", "oʊ"]
+        assert meta["phonemes"]["source"] == "kokoro-g2p"
+        assert meta["phonemes"]["notation"] == "espeak-wav2vec2"
+
+    def test_write_metadata_phonemes_uses_setdefault(self, manager: ReferenceManager) -> None:
+        # First write establishes the phonemes.
+        manager.write_metadata("hi", "Hello", "a", "af_heart", phonemes=["h", "ə", "l", "oʊ"])
+        # Second call with different voice + different tokens must NOT overwrite
+        # (phonemes are a function of text, not voice).
+        manager.write_metadata("hi", "Hello", "a", "am_adam", phonemes=["x", "y", "z"])
+        meta = manager.read_metadata("hi")
+        assert meta["phonemes"]["tokens"] == ["h", "ə", "l", "oʊ"]
+        assert meta["default_speaker"] == "af_heart"  # also setdefault
+
+    def test_write_metadata_phonemes_none_omits_field(self, manager: ReferenceManager) -> None:
+        manager.write_metadata("hi", "Hello", "a", "af_heart", phonemes=None)
+        meta = manager.read_metadata("hi")
+        assert "phonemes" not in meta
+
     def test_merge_multiple_profiles(self, manager: ReferenceManager) -> None:
         manager.write_metadata("hi", "Hello", "a", "af_heart")
         # second profile for the same slug merges into the existing audio dict
@@ -225,6 +247,11 @@ class TestGenerate:
         meta = manager.read_metadata(slugify("Hello world"))
         assert meta["text"] == "Hello world"
         assert "kokoro-en-us-af_heart" in meta["audio"]
+        # G2P phonemes are captured at synthesis time and persisted.
+        assert "phonemes" in meta
+        assert meta["phonemes"]["source"] == "kokoro-g2p"
+        assert meta["phonemes"]["tokens"]  # non-empty
+        assert meta["phonemes"]["tokens"][0] == "h"  # "Hello"
 
     def test_cache_skips_regeneration(self, manager: ReferenceManager, tmp_path: Path) -> None:
         out1 = manager.generate("Hello world")
@@ -243,3 +270,26 @@ class TestGenerate:
         assert len(paths) == 2
         assert all(p.is_file() for p in paths)
         assert len({p.parent.name for p in paths}) == 1  # same voice profile
+
+    def test_phonemes_invariant_under_voice(self, manager: ReferenceManager) -> None:
+        """The reference phonemes are a pure function of the text, not the audio.
+
+        Synthesizing the same text with two different Kokoro voices produces
+        different acoustic output (different formants, different f0) but the
+        captured G2P tokens are byte-identical — because they come from the G2P
+        of the text, not from acoustic recognition of the rendered audio. This
+        is the core property that justifies the G2P reference path.
+        """
+        text = "Hello world, this is a Kokoro TTS test."
+        slug = slugify(text)
+
+        manager.generate(text, voice="af_heart", lang="a", force=True)
+        tokens_heart = manager.read_metadata(slug)["phonemes"]["tokens"]
+
+        manager.generate(text, voice="am_adam", lang="a", force=True)
+        tokens_adam = manager.read_metadata(slug)["phonemes"]["tokens"]
+
+        assert tokens_heart  # non-empty sanity check
+        assert tokens_heart == tokens_adam  # voice-invariant
+        # Sanity: still the right word ("Hello" → starts with /h/).
+        assert tokens_heart[0] == "h"

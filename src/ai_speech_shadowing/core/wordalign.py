@@ -9,6 +9,10 @@ Caveat: misaki's notation ≠ the Wav2Vec2 espeak inventory (stress marks,
 ``ʤ`` vs ``dʒ``, uppercase stressed diphthongs). Normalization covers the common
 cases; alignment is best-effort, so an occasional boundary phoneme may be
 attributed to the neighbouring word. The underlying phoneme diff stays exact.
+
+The G2P / normalization helpers themselves live in :mod:`ai_speech_shadowing.core.g2p`
+so they can be shared with the TTS reference generator (which captures Kokoro's
+G2P output at synthesis time).
 """
 
 # This module deliberately handles IPA characters that RUF001 flags as
@@ -20,84 +24,17 @@ from __future__ import annotations
 import difflib
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ai_speech_shadowing.core.phoneme import DEFAULT_MODEL_ID, PhonemeOp
+from ai_speech_shadowing.core.g2p import g2p_words, norm_misaki  # noqa: F401  (re-export)
+from ai_speech_shadowing.core.phoneme import PhonemeOp
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-# misaki uppercase "stress" vowel codes -> espeak equivalents.
-_MISAKI_UPPER: dict[str, str] = {
-    "A": "eɪ",  # FACE
-    "O": "oʊ",  # GOAT
-    "I": "aɪ",  # PRICE
-    "W": "aʊ",  # MOUTH
-    "U": "u",  # GOOSE (best-effort)
-    "Y": "aɪ",
-    "E": "ɛ",  # DRESS
-}
-
-_espeak_tokens: list[str] | None = None
-
-
-def _get_espeak_tokens(model_id: str = DEFAULT_MODEL_ID) -> list[str]:
-    """Lazy-load the espeak vocab tokens (longest-first) from the HF cache."""
-    global _espeak_tokens
-    if _espeak_tokens is None:
-        import json
-
-        from huggingface_hub import hf_hub_download
-
-        vocab = json.loads(Path(hf_hub_download(model_id, "vocab.json")).read_text("utf-8"))
-        _espeak_tokens = sorted((t for t in vocab if not t.startswith("<")), key=len, reverse=True)
-    return _espeak_tokens
-
-
-def _tokenize(s: str, tokens: list[str]) -> list[str]:
-    """Greedy longest-match tokenization against an espeak vocab."""
-    out: list[str] = []
-    while s:
-        for tok in tokens:
-            if s.startswith(tok):
-                out.append(tok)
-                s = s[len(tok) :]
-                break
-        else:
-            s = s[1:]  # drop unrecognised char
-    return out
-
-
-def norm_misaki(phonemes: str) -> str:
-    """Normalize a misaki phoneme string toward espeak (pure string ops)."""
-    for ch in "ˈˌː":
-        phonemes = phonemes.replace(ch, "")
-    phonemes = phonemes.replace("ʤ", "dʒ").replace("ʧ", "tʃ")
-    for upper, espeak in _MISAKI_UPPER.items():
-        phonemes = phonemes.replace(upper, espeak)
-    return phonemes
-
 
 def _norm_ctc(tok: str) -> str:
     return tok.replace("ː", "")
-
-
-def g2p_words(text: str) -> list[tuple[str, list[str]]]:
-    """Phonemize ``text`` into ``(word, normalized-phoneme-tokens)`` pairs.
-
-    Punctuation / non-alphabetic tokens are dropped.
-    """
-    import misaki.en as en
-
-    g2p = en.G2P()
-    _full, mtokens = g2p(text)
-    tokens = _get_espeak_tokens()
-    out: list[tuple[str, list[str]]] = []
-    for mt in mtokens:
-        if mt.phonemes and any(c.isalpha() for c in mt.text):
-            out.append((mt.text, _tokenize(norm_misaki(mt.phonemes), tokens)))
-    return out
 
 
 @dataclass(frozen=True, slots=True)
