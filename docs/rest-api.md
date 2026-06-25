@@ -103,6 +103,10 @@ mapped to Kokoro's internal single-letter codes.
 
 ### Evaluate
 
+Both `/evaluate` and `/evaluate/quick` accept audio uploads up to **5 MB**
+(checked against the `Content-Length` header). For reference, a 60-second
+recording at 16 kHz 16-bit mono is ~1.9 MB, so real recordings fit comfortably.
+
 ```bash
 curl -X POST localhost:8000/api/v1/evaluate \
   -F 'audio=@user.wav' \
