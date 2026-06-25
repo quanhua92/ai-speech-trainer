@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ai_speech_shadowing.core.phoneme import DEFAULT_MODEL_ID
+from ai_speech_shadowing.core.phoneme import ESPEAK_MODEL_ID
 
 # misaki uppercase "stress" vowel codes -> espeak equivalents.
 _MISAKI_UPPER: dict[str, str] = {
@@ -41,7 +41,7 @@ _MISAKI_UPPER: dict[str, str] = {
 _espeak_tokens: list[str] | None = None
 
 
-def _get_espeak_tokens(model_id: str = DEFAULT_MODEL_ID) -> list[str]:
+def _get_espeak_tokens(model_id: str = ESPEAK_MODEL_ID) -> list[str]:
     """Lazy-load the espeak vocab tokens (longest-first) from the HF cache."""
     global _espeak_tokens
     if _espeak_tokens is None:

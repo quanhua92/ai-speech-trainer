@@ -133,8 +133,12 @@ def phoneme_cmd(
     ],
     model: Annotated[
         str,
-        typer.Option("--model", help="HuggingFace Wav2Vec2 phoneme model id."),
-    ] = "facebook/wav2vec2-lv-60-espeak-cv-ft",
+        typer.Option(
+            "--model",
+            help="Phoneme model key: 'slplab-l2' (default) or 'espeak'. "
+            "Overridable via the PHONEME_MODEL env var.",
+        ),
+    ] = "slplab-l2",
     device: Annotated[
         str, typer.Option("--device", help="'auto', 'cpu', 'mps', or 'cuda'.")
     ] = "auto",
@@ -147,9 +151,11 @@ def phoneme_cmd(
     ] = False,
 ) -> None:
     """Extract the IPA phoneme sequence from an audio file via Wav2Vec2-CTC."""
+    from ai_speech_shadowing.core.phoneme import get_phoneme_model
+
     sample = AudioSample.from_wav(input)
     canonical = sample if no_preprocess else preprocess(sample)
-    extractor = get_extractor(model_id=model, device=device)
+    extractor = get_phoneme_model(key=model, device=device)
     result = extractor.extract(canonical)
     typer.echo(result.raw_text if result.raw_text else "(no phonemes detected)")
 

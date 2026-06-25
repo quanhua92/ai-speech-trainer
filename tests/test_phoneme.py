@@ -1,25 +1,30 @@
-"""Tests for phoneme diff, PER, and (opt-in) Wav2Vec2 extraction.
+"""Tests for phoneme diff, PER, the no-drop normalizers, and (opt-in) extraction.
 
-The diff/PER logic is pure and tested exhaustively without any model. The
-extraction test is marked ``slow`` — it downloads ~1.2GB and only runs with
+The diff/PER logic and the pure-string normalizers (``_strip_tones_marks``,
+``_arpabet_base``, ``ARPABET_TO_IPA``) are exercised without any model. The
+extraction test is marked ``slow`` — it downloads a model and only runs with
 ``uv run pytest --runslow``.
 """
 
 from __future__ import annotations
 
 # IPA characters in this module are intentional.
-# ruff: noqa: RUF001
+# ruff: noqa: RUF001, RUF003
 from pathlib import Path
 
 import pytest
 
 from ai_speech_shadowing.core.audio import AudioSample
 from ai_speech_shadowing.core.phoneme import (
-    ENGLISH_PHONEMES,
+    ARPABET_TO_IPA,
+    DEFAULT_MODEL_KEY,
+    MODELS,
     PhonemeDiff,
-    PhonemeExtractor,
-    _normalize_to_language,
+    _arpabet_base,
+    _segments_to_espeak_units,
+    _strip_tones_marks,
     diff_phonemes,
+    get_phoneme_model,
     phoneme_error_rate,
 )
 from ai_speech_shadowing.core.preprocess import preprocess
@@ -124,51 +129,198 @@ class TestEdgeCases:
 
 
 # --------------------------------------------------------------------------- #
-# English-inventory filtering (no model)
+# espeak normalization (no model) — no-drop behavior
 # --------------------------------------------------------------------------- #
-class TestNormalizeToLanguage:
-    def test_drops_tonal_and_non_english_tokens(self) -> None:
+class TestStripTonesMarks:
+    def test_drops_tone_markers_but_keeps_everything_else(self) -> None:
         # Recognizer garbage from eval_cde21c1f: Mandarin tones + stray chars.
+        # Tone tokens (digit-bearing) are dropped; non-English consonants and
+        # alternate-notation vowels are KEPT (the old inventory filter deleted
+        # them, silently censoring real pronunciation info).
         raw = ("ð", "ə", "ɕ", "ɑ5", "ai5", "ei5", "u5", "iɜ", "k", "ɔː", "uː")
-        assert _normalize_to_language(raw, "en-us") == ("ð", "ə", "k", "ɔ", "u")
+        assert _strip_tones_marks(raw, "en-us") == ("ð", "ə", "ɕ", "iɜ", "k", "ɔ", "u")
 
     def test_strips_length_and_stress_marks(self) -> None:
-        assert _normalize_to_language(("ɜː", "ˈæ", "ˌt"), "en") == ("ɜ", "æ", "t")
+        assert _strip_tones_marks(("ɜː", "ˈæ", "ˌt"), "en") == ("ɜ", "æ", "t")
+
+    def test_keeps_alternate_notation_vowels_that_the_old_filter_dropped(self) -> None:
+        # Regression guard: bare "e", barred "ᵻ", and r-coloured "ɔːɹ" used to
+        # be silently deleted by the ENGLISH_PHONEMES inventory check. They must
+        # now survive (length/stress stripped, but the token kept).
+        assert _strip_tones_marks(("e", "eː", "ᵻ", "ɔːɹ"), "en") == ("e", "e", "ᵻ", "ɔɹ")
 
     def test_non_english_language_passes_through(self) -> None:
         raw = ("ɕ", "iɛ5", "a")
         # Spanish/French/etc. are not filtered — the model covers them natively.
-        assert _normalize_to_language(raw, "es") == raw
-        assert _normalize_to_language(raw, None) == raw
+        assert _strip_tones_marks(raw, "es") == raw
+        assert _strip_tones_marks(raw, None) == raw
 
     def test_keeps_english_diphthongs(self) -> None:
-        assert _normalize_to_language(("eɪ", "oʊ", "aɪ", "θ"), "en-gb") == (
+        assert _strip_tones_marks(("eɪ", "oʊ", "aɪ", "θ"), "en-gb") == (
             "eɪ",
             "oʊ",
             "aɪ",
             "θ",
         )
 
-    def test_reference_tokens_all_pass_filter(self) -> None:
-        # The Kokoro G2P output for an English reference must survive filtering.
-        ref_tokens = ["h", "əl", "oʊ", "w", "ɜ", "ɹ", "l", "d"]
-        assert list(_normalize_to_language(tuple(ref_tokens), "en-us")) == ref_tokens
-        # sanity: the inventory is non-empty and covers the basics
-        assert {"θ", "ð", "eɪ", "ɹ"} <= ENGLISH_PHONEMES
+
+# --------------------------------------------------------------------------- #
+# ARPAbet → IPA mapping (no model)
+# --------------------------------------------------------------------------- #
+class TestArpabetMapping:
+    def test_arpabet_base_strips_err_suffix(self) -> None:
+        assert _arpabet_base("g_err") == "g"
+        assert _arpabet_base("aa_err") == "aa"
+        assert _arpabet_base("ih_err") == "ih"
+
+    def test_arpabet_base_strips_star_suffix(self) -> None:
+        assert _arpabet_base("b*") == "b"
+        assert _arpabet_base("d*") == "d"
+        assert _arpabet_base("g*") == "g"
+
+    def test_arpabet_base_passes_plain_tokens_through(self) -> None:
+        assert _arpabet_base("ih") == "ih"
+        assert _arpabet_base("tʃ") == "tʃ"
+
+    def test_table_covers_every_base_phoneme(self) -> None:
+        # The slplab model's 89 phone tokens reduce (via _arpabet_base) to this
+        # exact set of bases. Every one must be in ARPABET_TO_IPA — no drops.
+        bases = {
+            "aa",
+            "ae",
+            "ah",
+            "ao",
+            "aw",
+            "ax",
+            "ay",
+            "b",
+            "ch",
+            "d",
+            "dh",
+            "eh",
+            "er",
+            "eu",
+            "ey",
+            "f",
+            "g",
+            "hh",
+            "ih",
+            "iy",
+            "jh",
+            "k",
+            "l",
+            "m",
+            "n",
+            "ng",
+            "o",
+            "ow",
+            "oy",
+            "p",
+            "r",
+            "s",
+            "sh",
+            "t",
+            "th",
+            "ts",
+            "uh",
+            "uw",
+            "v",
+            "w",
+            "y",
+            "z",
+            "zh",
+        }
+        assert set(ARPABET_TO_IPA) >= bases
+        # spot-check a few critical ones (esp. the Unicode ɡ for ARPAbet "g")
+        assert ARPABET_TO_IPA["g"] == "ɡ"
+        assert ARPABET_TO_IPA["ih"] == "ɪ"
+        assert ARPABET_TO_IPA["er"] == "ɝ"
+        assert ARPABET_TO_IPA["ng"] == "ŋ"
+
+    def test_full_sequence_maps_with_no_drops(self) -> None:
+        # "big bear" as decoded by slplab on clipped learner audio, incl. a
+        # _err flag on the g. Every token maps to a valid espeak-IPA segment.
+        raw = ("b", "ih", "g_err", "b", "eh", "r")
+        mapped = tuple(ARPABET_TO_IPA[_arpabet_base(t)] for t in raw)
+        assert mapped == ("b", "ɪ", "ɡ", "b", "ɛ", "ɹ")
+        assert len(mapped) == len(raw)  # no token dropped
 
 
 # --------------------------------------------------------------------------- #
-# Opt-in model test (downloads ~1.2GB; run with --runslow)
+# Segment -> espeak-unit collapse (no model; mocked espeak vocab)
+# --------------------------------------------------------------------------- #
+class TestSegmentCollapse:
+    def test_rejoins_r_coloured_vowels_to_espeak_units(self, monkeypatch) -> None:
+        # ɛ + ɹ must collapse to the single espeak unit ɛɹ that kokoro G2P
+        # emits — this is the notation-mismatch fix that takes PER 0.4 -> 0.0.
+        import ai_speech_shadowing.core.g2p as g2p_mod
+
+        mock_vocab = sorted(
+            ["b", "ɪ", "ɡ", "d", "ɛɹ", "ɛ", "ɹ", "eɪ", "oʊ", "tʃ", "t", "ʃ"],
+            key=len,
+            reverse=True,
+        )
+        monkeypatch.setattr(g2p_mod, "_get_espeak_tokens", lambda model_id="x": mock_vocab)
+
+        assert _segments_to_espeak_units(("b", "ɪ", "ɡ", "b", "ɛ", "ɹ")) == (
+            "b",
+            "ɪ",
+            "ɡ",
+            "b",
+            "ɛɹ",
+        )
+
+    def test_rejoins_affricates(self, monkeypatch) -> None:
+        import ai_speech_shadowing.core.g2p as g2p_mod
+
+        mock_vocab = sorted(["t", "ʃ", "tʃ", "d", "ʒ", "dʒ"], key=len, reverse=True)
+        monkeypatch.setattr(g2p_mod, "_get_espeak_tokens", lambda model_id="x": mock_vocab)
+
+        assert _segments_to_espeak_units(("t", "ʃ")) == ("tʃ",)
+        assert _segments_to_espeak_units(("d", "ʒ")) == ("dʒ",)
+
+    def test_already_maximal_tokens_pass_through(self, monkeypatch) -> None:
+        import ai_speech_shadowing.core.g2p as g2p_mod
+
+        mock_vocab = sorted(["eɪ", "oʊ", "aɪ", "h", "ə", "l"], key=len, reverse=True)
+        monkeypatch.setattr(g2p_mod, "_get_espeak_tokens", lambda model_id="x": mock_vocab)
+
+        assert _segments_to_espeak_units(("h", "ə", "l", "oʊ")) == ("h", "ə", "l", "oʊ")
+
+    def test_empty_input(self, monkeypatch) -> None:
+        import ai_speech_shadowing.core.g2p as g2p_mod
+
+        monkeypatch.setattr(g2p_mod, "_get_espeak_tokens", lambda model_id="x": ["b"])
+        assert _segments_to_espeak_units(()) == ()
+
+
+# --------------------------------------------------------------------------- #
+# Registry (no model load)
+# --------------------------------------------------------------------------- #
+class TestRegistry:
+    def test_default_is_slplab_l2(self) -> None:
+        assert DEFAULT_MODEL_KEY == "slplab-l2"
+        assert "slplab-l2" in MODELS
+        assert "espeak" in MODELS
+
+    def test_get_phoneme_model_unknown_key_raises(self) -> None:
+        with pytest.raises(ValueError, match="unknown phoneme model"):
+            get_phoneme_model(key="does-not-exist", reload=True)
+
+
+# --------------------------------------------------------------------------- #
+# Opt-in model test (downloads; run with --runslow)
 # --------------------------------------------------------------------------- #
 @pytest.mark.slow
 class TestExtractionWithModel:
     def test_extract_real_speech(self, kokoro_ref_wav: Path) -> None:
         """End-to-end: Kokoro reference → preprocess → phonemes.
 
-        Asserts the pipeline runs and yields a sensible IPA sequence for
-        "Hello world, this is a Kokoro TTS test."
+        Uses the default backend (slplab-l2). Asserts the pipeline runs and
+        yields a sensible IPA sequence for "Hello world, this is a Kokoro TTS
+        test."
         """
-        extractor = PhonemeExtractor(device="cpu")
+        extractor = get_phoneme_model(device="cpu", reload=True)
         sample = preprocess(AudioSample.from_wav(kokoro_ref_wav))
         result = extractor.extract(sample)
         assert len(result.phonemes) > 5
@@ -177,7 +329,7 @@ class TestExtractionWithModel:
         assert len(result.raw_text.split()) == len(result.phonemes)
 
     def test_extract_requires_16k(self, mono_44100_wav: Path) -> None:
-        extractor = PhonemeExtractor(device="cpu")
+        extractor = get_phoneme_model(device="cpu", reload=True)
         sample = AudioSample.from_wav(mono_44100_wav)  # 44.1kHz, not canonical
         with pytest.raises(ValueError, match="16000"):
             extractor.extract(sample)
