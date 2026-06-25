@@ -32,7 +32,13 @@ if [ -n "$existing" ]; then
   remaining=$(lsof -nP -tiTCP:"${PORT}" -sTCP:LISTEN 2>/dev/null || true)
   if [ -n "$remaining" ]; then
     echo "Port still held; force killing PID(s) ${remaining}..."
-    kill -9 $remaining 2>/dev/null || true
+    for pid in $remaining; do
+      if [ -f "/proc/$pid/cmdline" ] && grep -qa 'ai-speech-shadowing\|uvicorn' "/proc/$pid/cmdline" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null || true
+      else
+        echo "WARNING: PID $pid on port ${PORT} is not ai-speech-shadowing; not killing." >&2
+      fi
+    done
     sleep 0.5
   fi
 fi
@@ -40,7 +46,11 @@ fi
 if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
   echo "Generating self-signed TLS cert..."
   openssl req -x509 -newkey rsa:2048 -nodes \
-    -keyout "$KEY" -out "$CERT" -days 365 -subj "/CN=localhost" 2>/dev/null
+    -keyout "$KEY" -out "$CERT" -days 365 \
+    -subj "/CN=localhost" \
+    -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" 2>/dev/null
+  chmod 600 "$KEY"
+  chmod 644 "$CERT"
 fi
 
 # MPS fallback only applies on macOS; harmless but unnecessary on Linux.

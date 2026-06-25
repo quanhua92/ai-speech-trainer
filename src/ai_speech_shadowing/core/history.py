@@ -153,6 +153,7 @@ class HistoryEntry:
     path: Path
     composite_score: int
     composite_grade: str
+    reference_id: str | None = None
 
 
 def list_reports(
@@ -189,6 +190,7 @@ def list_reports(
                 path=path,
                 composite_score=int(composite.get("score", 0)),
                 composite_grade=str(composite.get("grade", "")),
+                reference_id=data.get("reference_id"),
             )
         )
     return entries

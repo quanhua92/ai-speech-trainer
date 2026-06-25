@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Annotated
 
@@ -81,8 +82,6 @@ def _run_evaluation(
         audio_url = f"/api/v1/history/{eval_id}/audio"
         _stamp_field(path, "audio_url", audio_url)
 
-    import json
-
     data = json.loads(path.read_text(encoding="utf-8"))
     return build_evaluation_response(
         report,
@@ -94,7 +93,6 @@ def _run_evaluation(
 
 
 def _stamp_field(path, field: str, value: object) -> None:
-    import json
     import os
 
     try:
@@ -160,10 +158,9 @@ def evaluate(
         )
     reference_audio = AudioSample.from_wav(ref_file)
     user_audio, attempt_bytes = _decode_upload(audio)
-    reference_text = str(state.reference_manager.read_metadata(reference_id).get("text", ""))
-    reference_language = (
-        str(state.reference_manager.read_metadata(reference_id).get("language", "")) or None
-    )
+    meta = state.reference_manager.read_metadata(reference_id)
+    reference_text = str(meta.get("text", ""))
+    reference_language = str(meta.get("language", "")) or None
     reference_phonemes = _read_reference_phonemes(state.reference_manager, reference_id)
 
     # normalise weights to sum 1

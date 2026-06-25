@@ -15,6 +15,9 @@ from pathlib import Path
 from ai_speech_shadowing.core.phoneme import PhonemeExtractor, get_extractor
 from ai_speech_shadowing.tts.generator import ReferenceConfig, ReferenceManager
 
+_EXTRACTOR_RETRY_COOLDOWN: float = 30.0
+"""Seconds to wait before retrying a failed extractor load."""
+
 
 @dataclass
 class EngineState:
@@ -29,19 +32,41 @@ class EngineState:
     tts_available: bool = False
     tts_load_time_ms: int | None = None
     _extractor_lock: threading.Lock = field(default_factory=threading.Lock)
+    _extractor_error_ts: float | None = None
+    _extractor_error: Exception | None = None
 
     def phoneme_extractor(self) -> PhonemeExtractor:
         """Lazily load the Wav2Vec2 phoneme model (once), recording load time.
 
         Double-checked locking: concurrent first-requests serialise on the lock
         so the ~350 MB model is loaded exactly once per process.
+
+        On failure the exception is cached and re-raised for a cooldown period
+        (``_EXTRACTOR_RETRY_COOLDOWN``) to avoid retry storms.
         """
-        if self._extractor is None:
-            with self._extractor_lock:
-                if self._extractor is None:
-                    t0 = time.perf_counter()
+        if self._extractor is not None:
+            return self._extractor
+        # Fast-path: still in cooldown after a prior failure.
+        err_ts = self._extractor_error_ts
+        if err_ts is not None and time.monotonic() - err_ts < _EXTRACTOR_RETRY_COOLDOWN:
+            raise self._extractor_error or RuntimeError("extractor load failed (cooldown)")
+        with self._extractor_lock:
+            if self._extractor is not None:
+                pass
+            elif (
+                self._extractor_error_ts is not None
+                and time.monotonic() - self._extractor_error_ts < _EXTRACTOR_RETRY_COOLDOWN
+            ):
+                raise self._extractor_error or RuntimeError("extractor load failed (cooldown)")
+            else:
+                t0 = time.perf_counter()
+                try:
                     self._extractor = get_extractor()
-                    self.extractor_load_time_ms = int((time.perf_counter() - t0) * 1000)
+                except Exception as exc:
+                    self._extractor_error_ts = time.monotonic()
+                    self._extractor_error = exc
+                    raise
+                self.extractor_load_time_ms = int((time.perf_counter() - t0) * 1000)
         return self._extractor
 
     def mark_tts_loaded(self, *, load_time_ms: int) -> None:

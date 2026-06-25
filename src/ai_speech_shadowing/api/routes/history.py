@@ -11,11 +11,12 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from ai_speech_shadowing.api.deps import get_state
 from ai_speech_shadowing.api.schemas import (
+    HistoryItem,
     PaginatedHistory,
     StatsResponse,
-    build_history_item,
 )
 from ai_speech_shadowing.core.history import (
+    HistoryEntry,
     compute_stats,
     delete_report,
     list_reports,
@@ -47,13 +48,21 @@ def list_history(
     total = len(entries)
     page = entries[offset : offset + limit]
     return PaginatedHistory(
-        items=[
-            build_history_item(load_report(e.id, state.history_dir, user_id=uid) or {"id": e.id})
-            for e in page
-        ],
+        items=[build_history_item_from_entry(e) for e in page],
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+def build_history_item_from_entry(e: HistoryEntry) -> HistoryItem:
+    """Build a HistoryItem from a HistoryEntry, avoiding a file re-read."""
+    return HistoryItem(
+        id=e.id,
+        created_at=e.created_at,
+        reference_id=e.reference_id,
+        composite_score=e.composite_score,
+        composite_grade=e.composite_grade,
     )
 
 
