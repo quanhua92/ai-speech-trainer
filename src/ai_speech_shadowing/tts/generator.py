@@ -34,12 +34,40 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from kokoro import KPipeline
+
 import numpy as np
 
 from ai_speech_shadowing.core.g2p import misaki_to_espeak_tokens
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
+
+# Process-wide KPipeline cache: keyed by lang_code, loaded at most once per
+# process. "lang" is a single-letter Kokoro language code ("a" for en-us, etc.).
+# The phoneme model is similarly cached in phoneme.py.
+_pipeline_cache: dict[str, KPipeline] = {}
+_pipeline_lock = threading.Lock()
+
+
+def get_pipeline(lang_code: str) -> KPipeline:
+    """Return a process-wide cached KPipeline, loading it on first use.
+
+    Double-checked locking: concurrent first-callers serialise on the lock so
+    the ~330 MB model is loaded exactly once per language code per process.
+    """
+    pipeline = _pipeline_cache.get(lang_code)
+    if pipeline is None:
+        with _pipeline_lock:
+            pipeline = _pipeline_cache.get(lang_code)
+            if pipeline is None:
+                from kokoro import KPipeline
+
+                pipeline = KPipeline(lang_code=lang_code)
+                _pipeline_cache[lang_code] = pipeline
+    return pipeline
+
 
 KOKORO_SAMPLE_RATE: int = 24000
 """Kokoro's output sample rate (its only supported synthesis rate)."""
@@ -337,7 +365,6 @@ class ReferenceManager:
         ``force`` is False.
         """
         import soundfile as sf
-        from kokoro import KPipeline
 
         voice = voice or self.config.default_voice
         lang = lang or self.config.default_lang
@@ -350,7 +377,7 @@ class ReferenceManager:
         out.parent.mkdir(parents=True, exist_ok=True)
         phoneme_tokens: tuple[str, ...] = ()
         try:
-            pipeline = KPipeline(lang_code=lang)
+            pipeline = get_pipeline(lang)
             chunks: list[np.ndarray] = []
             ps_parts: list[str] = []
             for _gs, ps, audio in pipeline(text, voice=voice):
