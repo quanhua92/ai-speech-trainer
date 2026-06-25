@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Annotated
 
@@ -634,6 +635,9 @@ def serve_cmd(
 
     scheme = "https" if ssl_certfile else "http"
     typer.echo(f"Serving API on {scheme}://{host}:{port}/api/v1  (docs at /docs)")
+    extra: dict[str, object] = {}
+    if not reload:
+        extra["workers"] = max(2, os.cpu_count() or 2)
     uvicorn.run(
         "ai_speech_shadowing.api.app:app",
         host=host,
@@ -641,4 +645,5 @@ def serve_cmd(
         reload=reload,
         ssl_certfile=str(ssl_certfile) if ssl_certfile else None,
         ssl_keyfile=str(ssl_keyfile) if ssl_keyfile else None,
+        **extra,
     )

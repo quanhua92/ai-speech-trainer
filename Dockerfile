@@ -63,6 +63,12 @@ COPY --from=builder /models           /models
 COPY --from=builder /app/data/references /app/data/references
 COPY static/                          /app/static/
 
+RUN adduser --system --no-create-home appuser \
+    && mkdir -p /app/data/history /app/data/recordings \
+    && chown -R appuser:appuser /app/data
+
+USER appuser
+
 EXPOSE 8000
 ENTRYPOINT ["/app/.venv/bin/ai-speech-shadowing"]
 CMD ["serve", "--host", "0.0.0.0", "--port", "8000"]

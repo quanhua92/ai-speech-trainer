@@ -20,7 +20,6 @@ from ai_speech_shadowing.api.identity import (
     USER_ID_COOKIE,
     generate_token,
     hash_token,
-    is_production,
     is_valid_user_id,
 )
 from ai_speech_shadowing.api.routes import demo, evaluate, health, history, reference
@@ -104,12 +103,13 @@ def create_app() -> FastAPI:
             request.state.user_id = hash_token(new_token)
         response = await call_next(request)
         if new_token is not None:
+            secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
             response.set_cookie(
                 USER_ID_COOKIE,
                 new_token,
                 httponly=True,
                 samesite="lax",
-                secure=is_production(),
+                secure=secure,
                 max_age=COOKIE_MAX_AGE,
                 path="/",
             )

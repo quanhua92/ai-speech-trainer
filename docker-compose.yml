@@ -14,6 +14,12 @@ services:
       # default references), so the demo is populated immediately.
       - app-data:/app/data
     restart: unless-stopped
+    mem_limit: 4g
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test:
         - CMD
