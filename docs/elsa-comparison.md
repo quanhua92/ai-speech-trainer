@@ -67,18 +67,24 @@ focused on *how* you speak rather than *what* you say or understand
 
 | | ELSA Speak | ai-speech-shadowing |
 | --- | --- | --- |
-| Model | Proprietary DL, trained on millions of **non-native** samples | `facebook/wav2vec2-lv-60-espeak-cv-ft`, trained mostly on **native** Common Voice (`core/phoneme.py:29`) |
-| L1 awareness | **Yes** — weights errors by speaker's native language | **No** — language-agnostic edit distance |
-| Metric | Per-sound confidence scores | Phoneme Error Rate = `(sub+del+ins)/len(ref)` (`core/phoneme.py:64-75`) |
+| Model | Proprietary DL, trained on millions of **non-native** samples | `slplab/wav2vec2-large-robust-L2-english-phoneme-recognition` — trained on **Korean L2 English** learner speech (default); multilingual `espeak` model also available (`core/phoneme.py`) |
+| L1 awareness | **Yes** — weights errors by speaker's native language | **Partial** — the default model was trained on L2 learner errors (Korean-accented English) and tags mispronunciations with an `_err` suffix; the diff itself is language-agnostic edit distance |
+| Metric | Per-sound confidence scores | Phoneme Error Rate = `(sub+del+ins)/len(ref)` (`core/phoneme.py`) |
 | Score | 0–100 per sound and per word | `(1 − PER) × 100`, clamped to ≥ 0 |
 
 **Implication:** ELSA's pronunciation score adapts to typical L1-interference
-patterns (e.g. a Vietnamese speaker's `/θ/` errors are scored with that population's
-distribution in mind). This project applies a uniform cost to every phoneme edit,
-regardless of who is speaking.
+patterns across *many* native languages (e.g. a Vietnamese speaker's `/θ/`
+errors are scored with that population's distribution in mind). This project's
+default model has seen **one** L2 population (Korean learners) during training,
+so it recognizes the accent patterns of that group more forgivingly than a
+native-trained model would — but it does not re-weight errors per speaker L1.
+The diff that produces the PER applies a uniform cost to every phoneme edit.
 
-> **Measured with:** Meta's Wav2Vec2-CTC phoneme model + `difflib` sequence alignment.
-> See [`phoneme-extraction.md`](phoneme-extraction.md) for the full pipeline.
+> **Measured with:** the slplab L2-English Wav2Vec2-CTC model (ARPAbet output
+> mapped 1:1 to espeak IPA, segments rejoined to espeak units) + `difflib`
+> sequence alignment. The reference side uses kokoro's G2P output, not the
+> recognizer. See [`phoneme-extraction.md`](phoneme-extraction.md) for the full
+> pipeline.
 
 > **Calibration note (pre- vs. post-cutover).** Earlier PER figures in this
 > document were recorded when *both* reference and hypothesis were decoded
@@ -159,7 +165,8 @@ ranking individual sounds by quality.
 
 **Use ELSA Speak if you want:**
 - The broadest set of scored dimensions (stress, listening, grammar).
-- L1-aware pronunciation scoring calibrated to your native language.
+- **Multi-L1** pronunciation scoring calibrated to *your* native language
+  (this project's model has seen only Korean-accented English).
 - Numeric per-word and per-phoneme scores.
 - A polished, adaptive consumer product with a curriculum.
 
@@ -180,7 +187,9 @@ To set expectations clearly, relative to ELSA this project currently:
 - Has a **coarser intonation** model (range ratio, not contour shape).
 - Has a **fluency** pillar that overlaps with pronunciation/timbre.
 - Produces **categorical**, not numeric, per-phoneme and per-word output.
-- Uses a **general-purpose** phoneme model with **no L1 adaptation**.
+- Uses a **single-L2** phoneme model (Korean learner English) with no per-speaker
+  L1 adaptation — more forgiving than a native-trained model for that accent, but
+  not re-weighted per user.
 - Generates **deterministic, rule-based** feedback (no adaptive personalisation).
 
 These are deliberate scoping choices for a local-first shadowing engine, not oversights.

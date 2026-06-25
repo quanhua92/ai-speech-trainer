@@ -2,6 +2,8 @@
 
 A local-first speech evaluation engine for language learning via the **shadowing technique**. Compare recorded user audio against native TTS reference clips and get multi-dimensional feedback on **pronunciation, prosody, and fluency** — entirely offline, with zero per-evaluation cost.
 
+**Scoring blends three pillars:** pronunciation (did you produce the right sounds, via a phoneme model trained on learner speech), intonation (did your pitch rise and fall like the reference), and fluency (did your pacing and rhythm match).
+
 > **Status:** Alpha — core engine, REST API, interactive demo, and Docker all complete (Phases 0–8). Phase 9 (optimization) and Phase 10 (full web UI) pending.
 
 For the full architecture, roadmap, and API specification, see [`docs/README.md`](docs/README.md).
@@ -45,6 +47,37 @@ To add your own:
 just serve                              # web UI — type a sentence, click Generate
 uv run ai-speech-shadowing generate-reference --list data/default.txt  # batch from CLI
 ```
+
+## How scoring works
+
+Each evaluation produces a weighted composite score (0–100) from three
+independent pillars:
+
+| Pillar | Weight | Signal | Source |
+| --- | :---: | --- | --- |
+| Pronunciation | **40%** | Phoneme Error Rate (PER) | L2-English Wav2Vec2 + G2P diff |
+| Intonation | **30%** | Pitch-range ratio | Parselmouth (Praat) F0 extraction |
+| Fluency | **30%** | DTW spectral distance | librosa MFCC + fastdtw |
+
+Grades: `≥80` good 🟢 · `≥50` fair 🟡 · `<50` needs_work 🔴
+
+- **Pronunciation** decodes your audio with a phoneme model **trained on
+  non-native English learner speech** (Korean L2 data, annotated with
+  pronunciation errors), maps the output to the same espeak-IPA notation the
+  reference uses, and computes PER against the kokoro G2P target.
+  Score = `(1 − PER) × 100`.
+- **Intonation** compares the width of your F0 pitch excursion to the
+  reference's. A monotone delivery is flagged when your range falls below a
+  threshold. Score = `min(1, ratio) × 100`.
+- **Fluency** aligns your MFCC feature matrix against the reference's with
+  dynamic time warping. Score = `max(0, 1 − DTW_distance / scale) × 100`.
+  Syllable rate and pause count are tracked for feedback text.
+
+The phoneme backend is **pluggable** via the `PHONEME_MODEL` env var: the
+default `slplab-l2` recognizes accented speech; the multilingual `espeak`
+backend is available as a fallback. See
+[`docs/phoneme-extraction.md`](docs/phoneme-extraction.md) and
+[`docs/feedback-scoring.md`](docs/feedback-scoring.md) for details.
 
 ## Development
 

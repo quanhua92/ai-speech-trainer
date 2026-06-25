@@ -1,5 +1,7 @@
 # Feedback Engine & Scoring
 
+**Three pillars in plain terms:** pronunciation (did you produce the right sounds, via a phoneme model trained on learner speech), intonation (did your pitch rise and fall like the reference), and fluency (did your pacing and rhythm match).
+
 > **Phase 5 deliverable.** Unifies the three pillars — phoneme (PER), prosody
 > (pitch-range-ratio), fluency (DTW) — into a single `FeedbackReport` with a
 > weighted composite score, colour-coded severity grades, targeted textual
@@ -81,7 +83,7 @@ from ai_speech_shadowing.core.preprocess import preprocess
 
 ref = preprocess(AudioSample.from_wav("reference.wav"))
 hyp = preprocess(AudioSample.from_wav("user.wav"))
-report = evaluate(ref, hyp)  # loads the Wav2Vec2 phoneme model on first call
+report = evaluate(ref, hyp)  # loads the phoneme model on first call (default: slplab-l2)
 ```
 
 `evaluate` runs, in order: phoneme extraction + `diff_phonemes`, `extract_pitch`
@@ -122,7 +124,8 @@ ai-speech-shadowing evaluate reference.wav user.wav --format markdown
 ai-speech-shadowing evaluate reference.wav user.wav --weights 0.5,0.25,0.25
 ```
 
-The first call downloads/loads the ~1.2 GB Wav2Vec2 model.
+The first call downloads/loads the phoneme model (default `slplab-l2`, ~0.3 B
+params; selectable via the `PHONEME_MODEL` env var).
 
 Sample terminal output (identical clip vs. itself):
 ```
