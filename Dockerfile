@@ -63,7 +63,7 @@ COPY --from=builder /models           /models
 COPY --from=builder /app/data/references /app/data/references
 COPY static/                          /app/static/
 
-RUN adduser --system --no-create-home appuser \
+RUN adduser --system --group --no-create-home appuser \
     && mkdir -p /app/data/history /app/data/recordings \
     && chown -R appuser:appuser /app/data
 
