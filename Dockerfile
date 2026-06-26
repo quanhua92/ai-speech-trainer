@@ -50,10 +50,12 @@ ENV HF_HOME=/models \
 # Runtime system libraries only (no compilers → smaller image):
 #   libsndfile1 — soundfile WAV decode (wheel bundles it too)
 #   libgomp1    — torch's OpenMP runtime on linux
+#   nginx       — in-container reverse proxy (cookie-sticky across uvicorns)
+#   supervisor  — PID 1 that manages nginx + the uvicorn workers
 # Note: espeak-ng is NOT needed — the espeakng-loader wheel (a misaki[en] dep)
 #   vendors libespeak-ng + espeak-ng-data for linux x86-64/arm64.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libsndfile1 libgomp1 ca-certificates \
+        libsndfile1 libgomp1 ca-certificates nginx supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -62,6 +64,7 @@ COPY --from=builder /app/src          /app/src
 COPY --from=builder /models           /models
 COPY --from=builder /app/data/references /app/data/references
 COPY static/                          /app/static/
+COPY docker/                          /app/docker/
 
 # appuser needs a real, owned HOME so libraries that cache to $HOME/.cache
 # (numba/librosa's @jit cache, etc.) have a writable location. Without it they
@@ -78,5 +81,8 @@ RUN adduser --system --group --home /home/appuser appuser \
 USER appuser
 
 EXPOSE 8000
-ENTRYPOINT ["/app/.venv/bin/ai-speech-shadowing"]
-CMD ["serve", "--host", "0.0.0.0", "--port", "8000"]
+# supervisord (PID 1) manages nginx + 2 single-worker uvicorns (see
+# docker/supervisord.conf). nginx does cookie-sticky routing across the uvicorns
+# (docker/nginx.conf). Replaces uvicorn's built-in multi-worker spawner.
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/app/docker/supervisord.conf"]
+CMD []

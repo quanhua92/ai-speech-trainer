@@ -727,7 +727,6 @@ sequenceDiagram
 | `PHONEME_MODEL` | `slplab-l2` | Phoneme recognizer backend (`slplab-l2` / `espeak`) | [phoneme-extraction.md](phoneme-extraction.md) |
 | `HF_HOME` | HF cache default | HuggingFace model cache location | [docker.md](docker.md) |
 | `HF_HUB_OFFLINE` | `1` (in Docker/serve.sh) | Skip HuggingFace network/etag validation — models must be pre-cached | [docker.md](docker.md) |
-| `WORKERS` | `2` | uvicorn worker count (each loads its own ~2 GB of models) | [docker.md](docker.md) |
 | `HISTORY_RETENTION_DAYS` | `7` | Delete eval reports older than this; `0` = keep forever | [storage.md](storage.md) |
 | `HISTORY_CLEANUP_INTERVAL_HOURS` | `24` | How often the background cleanup sweep runs | [storage.md](storage.md) |
 | `ENV` | _(unset)_ | `production` → cookies get `secure=True` (HTTPS-only) | [storage.md](storage.md) |

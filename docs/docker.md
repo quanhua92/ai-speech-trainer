@@ -22,8 +22,42 @@ fully offline.
 | --- | --- |
 | `/app` | The installed package (`ai_speech_shadowing`) |
 | `/app/data/references/` | Bundled default references (shipped in git) |
+| `/app/data/storage/` | Leaderboard `db.json` + `hashes/` (created at runtime) |
+| `/app/docker/` | `nginx.conf` + `supervisord.conf` (the in-container supervisor/proxy) |
 | `/models` | Pre-warmed HF cache (`HF_HOME=/models`): Kokoro-82M + Wav2Vec2 |
-| Entrypoint | `ai-speech-shadowing serve --host 0.0.0.0 --port 8000` |
+| Entrypoint | `supervisord -c /app/docker/supervisord.conf` (PID 1) |
+
+## In-container architecture (supervisord → nginx → uvicorn)
+
+The container runs **one process tree**, all as non-root `appuser`:
+
+```
+:8000 → nginx  (cookie-sticky: hash $cookie_user_id consistent)
+            ├─ 127.0.0.1:8001  uvicorn-1  (WORKERS=1)
+            └─ 127.0.0.1:8002  uvicorn-2  (WORKERS=1)
+supervisord (PID 1) manages all three; restarts any that crash.
+```
+
+- **`supervisord`** is PID 1 (`docker/supervisord.conf`). It launches nginx +
+  two single-worker uvicorns and revives any that crash. On `docker stop`
+  (SIGTERM) it stops the uvicorns first (`stopsignal=TERM`) so each runs its
+  lifespan shutdown → the final leaderboard flush.
+- **`nginx`** (`docker/nginx.conf`) listens on `:8000` and routes by the
+  `user_id` cookie: `hash $cookie_user_id consistent`. A cookie-less first visit
+  is routed on `$request_id` (round-robin) until the app sets the cookie. It
+  forwards `Upgrade`/`Connection` (WebSocket/ASGI-aware) and the usual
+  `X-Forwarded-*` headers. Plain HTTP inside — TLS is terminated by the external
+  prod proxy.
+- **uvicorn** workers are launched with the existing CLI
+  (`ai-speech-shadowing serve --host 127.0.0.1 --port 800X`, `WORKERS=1`) so they
+  reuse the logging config + lifespan (history/reference/leaderboard tasks).
+
+Each worker loads its own ~2 GB of models and keeps its own in-memory
+leaderboard cache; they share only the filesystem. The number of workers is the
+count of `[program:uvicorn-N]` entries (2) — there is no `WORKERS` env var
+anymore. Memory ≈ workers × ~2 GB; the compose `mem_limit: 8g` covers 2 with
+headroom. Stickiness gives each user an instant *own*-count; the global
+leaderboard view is still cross-worker (see [db.md](db.md#eventual-consistency)).
 
 ## Volumes & persistence
 

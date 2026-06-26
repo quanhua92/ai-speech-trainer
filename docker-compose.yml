@@ -13,9 +13,10 @@ services:
       # Offline mode skips HuggingFace's per-file etag/HEAD validation that
       # otherwise adds ~5-6s to every cold model load.
       HF_HUB_OFFLINE: "1"
-      # Each worker loads its own ~2 GB of models (Wav2Vec2 + Kokoro); 2 workers
-      # → ~4 GB, well within the 8 GB limit below with headroom for overhead.
-      WORKERS: "2"
+      # The container runs supervisord → nginx → 2 single-worker uvicorns
+      # (cookie-sticky, see docker/supervisord.conf + docker/nginx.conf). Each
+      # uvicorn loads its own ~2 GB of models; 2 → ~4 GB, within the 8 GB limit.
+      # Worker count is the number of [program:uvicorn-N] entries, not an env.
     volumes:
       # Named volume → persists user recordings, history, references, AND the
       # leaderboard (data/storage/{db.json,hashes}). On first create Docker seeds

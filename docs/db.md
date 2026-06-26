@@ -34,8 +34,11 @@ workers). The public API masks it (first 8 hex chars) — see `GET /api/v1/leade
 ## Design constraints
 
 1. **No per-request disk I/O.** Evaluation latency must not pay for a leaderboard write.
-2. **Multiple workers.** `WORKERS=2` (default) means two separate processes that do
-   **not** share memory. They must not overwrite each other's counts.
+2. **Multiple workers.** The container runs supervisord → nginx → 2 single-worker
+   uvicorns (cookie-sticky; see [docker.md](docker.md)). Two separate processes
+   that do **not** share memory — they must not overwrite each other's counts.
+   Stickiness makes a user's *own* count instant (always their worker) but the
+   global view is still cross-worker, so the flush/merge below stays necessary.
 3. **Sync handlers.** Every route is a plain `def` (no `async def`), so Starlette
    dispatches them to an external threadpool — real concurrent threads within a
    worker process.

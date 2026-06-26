@@ -96,6 +96,13 @@ export LEADERBOARD_FLUSH_SECONDS="${LEADERBOARD_FLUSH_SECONDS:-10}"
 # edits show on a plain reload — no restart, no hard-refresh. Prod leaves this
 # unset and caches the HTML once at import.
 export STATIC_NOCACHE="${STATIC_NOCACHE:-1}"
+
+# Dev: a single worker. The CLI already defaults to WORKERS=1 (set here
+# explicitly so it's overridable). Prod doesn't use WORKERS at all — supervisord
+# manages 2 cookie-sticky uvicorns, each WORKERS=1. FastAPI runs sync endpoints
+# in a threadpool, so one worker still handles concurrency (torch/numpy release
+# the GIL).
+export WORKERS="${WORKERS:-1}"
 LOG="/tmp/ai-speech-shadowing-${PORT}.log"
 if [ -t 1 ]; then
   exec uv run ai-speech-shadowing serve \

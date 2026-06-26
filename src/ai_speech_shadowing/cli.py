@@ -653,11 +653,12 @@ def serve_cmd(
     if not reload:
         # Each worker loads its OWN copy of the Wav2Vec2 (~1.2 GB) + Kokoro
         # models, so workers x ~2 GB dominates memory and the per-worker cold
-        # load (~14 s) is paid once per worker. Default 2 for this single-user
-        # local app; override via WORKERS. FastAPI runs the sync endpoints in a
-        # threadpool anyway, so even 1 worker handles concurrency (torch/numpy
-        # release the GIL during inference).
-        workers = max(1, int(os.environ.get("WORKERS", "2")))
+        # load (~14 s) is paid once per worker. Default 1: one worker is enough
+        # because FastAPI runs the sync endpoints in a threadpool (torch/numpy
+        # release the GIL during inference), and it halves memory + cold-load.
+        # Prod runs N cookie-sticky single-worker uvicorns via supervisord (which
+        # sets WORKERS=1 per process); scale those by adding [program:uvicorn-N].
+        workers = max(1, int(os.environ.get("WORKERS", "1")))
         extra["workers"] = workers
     uvicorn.run(
         "ai_speech_shadowing.api.app:app",
