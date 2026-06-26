@@ -13,6 +13,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ai_speech_shadowing.core.leaderboard import LeaderboardStore, default_db_path
 from ai_speech_shadowing.core.phoneme import PhonemeExtractor, get_extractor
 from ai_speech_shadowing.tts.generator import ReferenceConfig, ReferenceManager
 
@@ -20,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 _EXTRACTOR_RETRY_COOLDOWN: float = 30.0
 """Seconds to wait before retrying a failed extractor load."""
+
+
+def _default_leaderboard() -> LeaderboardStore:
+    return LeaderboardStore(default_db_path())
 
 
 @dataclass
@@ -30,6 +35,7 @@ class EngineState:
         default_factory=lambda: ReferenceManager(ReferenceConfig())
     )
     history_dir: Path = field(default_factory=lambda: Path("data/history"))
+    leaderboard: LeaderboardStore = field(default_factory=_default_leaderboard)
     _extractor: PhonemeExtractor | None = None
     extractor_load_time_ms: int | None = None
     tts_available: bool = False

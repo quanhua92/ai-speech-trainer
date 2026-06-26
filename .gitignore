@@ -227,6 +227,7 @@ tmp/
 # Runtime user data (regenerable).
 data/recordings/
 data/history/
+data/storage/
 
 # Reference prompts. The default set is already tracked in-repo; ignore any
 # newly generated/regenerated references so they don't bloat the repo.

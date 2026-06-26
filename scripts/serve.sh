@@ -86,6 +86,11 @@ fi
 
 # MPS fallback only applies on macOS; harmless but unnecessary on Linux.
 # export PYTORCH_ENABLE_MPS_FALLBACK=1
+
+# Leaderboard counts are in-memory and flushed to data/storage/db.json every
+# LEADERBOARD_FLUSH_SECONDS. Shorter here so the e2e test (and the UI) see new
+# evaluations quickly during local dev; prod overrides as needed.
+export LEADERBOARD_FLUSH_SECONDS="${LEADERBOARD_FLUSH_SECONDS:-10}"
 LOG="/tmp/ai-speech-shadowing-${PORT}.log"
 if [ -t 1 ]; then
   exec uv run ai-speech-shadowing serve \

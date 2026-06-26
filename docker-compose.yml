@@ -21,6 +21,9 @@ services:
       # On first create Docker seeds it from the image's /app/data (the bundled
       # default references), so the demo is populated immediately.
       - app-data:/app/data
+      # Leaderboard db.json — host-persistent (survives rebuilds, inspectable).
+      # Nested bind mount takes precedence for this subpath.
+      - ./data/storage:/app/data/storage
     restart: unless-stopped
     mem_limit: 8g
     logging:

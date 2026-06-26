@@ -160,6 +160,13 @@
       <div id="history-list" class="lg:max-h-[45vh] lg:overflow-y-auto flex-1"></div>
     </section>
 
+    <!-- 6 · Leaderboard -->
+    <section class="bg-panel border border-border rounded-xl p-4">
+      <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-lb">6 · Leaderboard</h2>
+      <div id="lb-me" class="text-sm mb-2"></div>
+      <div id="lb-list" class="font-mono text-xs leading-relaxed"></div>
+    </section>
+
   </div><!-- /right column -->
 
 </div><!-- /layout -->
@@ -408,7 +415,7 @@ async function runEval(fn) {
     const res = await fn();
     renderResults(res);
     setStatus(st, `Done — ${res.id}`);
-    loadHistory(); refreshHealth();
+    loadHistory(); refreshHealth(); loadLeaderboard();
   } catch (e) {
     setStatus(st, e.message, true);
     setResultsState("empty");
@@ -499,6 +506,37 @@ async function deleteHistory(id) {
   try { const r = await fetch(`${API}/history/${id}`, { method: "DELETE" }); if (!r.ok && r.status !== 204) throw new Error(r.status); loadHistory(); }
   catch (e) { alert("Delete failed: " + e.message); }
 }
+
+/* ---------- leaderboard ---------- */
+async function loadLeaderboard() {
+  try {
+    const lb = await jget(`${API}/leaderboard?limit=10`);
+    const meEl = document.getElementById("lb-me");
+    const listEl = document.getElementById("lb-list");
+    let html = `<div class="text-muted text-xs">${t("lb_total")}: <b class="text-text">${lb.total_evaluations}</b></div>`;
+    if (lb.me) {
+      const rank = lb.me.rank
+        ? `${t("lb_rank")} <b>#${lb.me.rank}</b>`
+        : `<span class="text-muted">${t("lb_unranked")}</span>`;
+      const last = lb.me.last_evaluated
+        ? ` &middot; ${t("lb_last")} ${new Date(lb.me.last_evaluated).toLocaleString()}`
+        : "";
+      html += `<div class="mt-1.5"><span class="text-muted">${t("lb_myid")}:</span> `
+        + `<span class="font-mono text-accent">${lb.me.id}</span> `
+        + `&middot; <b>${lb.me.count}</b> ${t("lb_evals")} &middot; ${rank}${last}</div>`;
+    }
+    meEl.innerHTML = html;
+    if (lb.top.length) {
+      const myId = lb.me ? lb.me.id : null;
+      listEl.innerHTML = lb.top.map(e => {
+        const cls = e.id === myId ? "text-accent font-bold" : "text-text";
+        return `<div class="${cls}"><span class="text-muted w-7 inline-block">#${e.rank}</span> ${e.id} <b class="float-right">${e.count}</b></div>`;
+      }).join("");
+    } else {
+      listEl.innerHTML = `<div class="text-muted">${t("lb_empty")}</div>`;
+    }
+  } catch (e) { console.error(e); }
+}
 async function viewHistory(id) {
   try {
     const data = await jget(`${API}/history/${id}`);
@@ -527,8 +565,11 @@ const I18N = {
     card_pron:"Pronunciation", card_into:"Intonation", card_flu:"Fluency", card_comp:"Composite",
     grades:{good:"Good",fair:"Fair",needs_work:"Needs Work"},
     s1:"1 · Reference", s2:"2 · Your attempt", s3:"3 · Evaluate", s4:"4 · Results", s5:"5 · History",
+    s6:"6 · Leaderboard",
     ref_ph:"Type a sentence to synthesize…",
     ref_or_label:"or pick an existing reference",
+    lb_total:"Total", lb_you:"You", lb_evals:"evals", lb_rank:"rank", lb_last:"last", lb_empty:"No data yet.",
+    lb_myid:"My id", lb_unranked:"not ranked yet",
   },
   vi: { subtitle:"luyện phát âm với AI", existing:"— bản dịch có sẵn —",
     gen:"Tạo", refresh:"Làm mới", record:"Ghi âm", evaluate:"Đánh giá",
@@ -538,8 +579,11 @@ const I18N = {
     card_pron:"Phát âm", card_into:"Ngữ điệu", card_flu:"Nhịp điệu", card_comp:"Tổng hợp",
     grades:{good:"Tốt",fair:"Tạm được",needs_work:"Cần cải thiện"},
     s1:"1 · Bản dịch chuẩn", s2:"2 · Bản ghi âm", s3:"3 · Đánh giá", s4:"4 · Kết quả", s5:"5 · Lịch sử",
+    s6:"6 · Bảng xếp hạng",
     ref_ph:"Nhập câu cần tổng hợp…",
     ref_or_label:"hoặc chọn bản dịch có sẵn",
+    lb_total:"Tổng", lb_you:"Bạn", lb_evals:"lần", lb_rank:"hạng", lb_last:"gần nhất", lb_empty:"Chưa có dữ liệu.",
+    lb_myid:"ID của bạn", lb_unranked:"chưa xếp hạng",
   },
 };
 let LANG = localStorage.getItem("lang") || "en";
@@ -553,6 +597,7 @@ function applyI18n() {
   document.getElementById("title-eval").textContent = m.s3;
   document.getElementById("title-res").textContent = m.s4;
   document.getElementById("title-hist").textContent = m.s5;
+  document.getElementById("title-lb").textContent = m.s6;
   document.getElementById("ref-text").placeholder = m.ref_ph;
   document.getElementById("ref-or-label").textContent = m.ref_or_label;
   document.getElementById("btn-gen").textContent = m.gen;
@@ -570,7 +615,7 @@ if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 document.getElementById("ui-lang").value = LANG;
 applyI18n();
 loadSettings();
-refreshHealth(); loadReferences(); loadHistory();
+refreshHealth(); loadReferences(); loadHistory(); loadLeaderboard();
 </script>
 </body>
 </html>

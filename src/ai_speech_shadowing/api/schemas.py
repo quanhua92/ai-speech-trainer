@@ -233,6 +233,29 @@ def build_history_item(data: dict) -> HistoryItem:
     )
 
 
+# --------------------------------------------------------------------------- #
+# Leaderboard
+# --------------------------------------------------------------------------- #
+class LeaderboardEntry(BaseModel):
+    rank: int
+    id: str = Field(description="Masked user id (first 8 hex chars).")
+    count: int
+    last_evaluated: str | None = None
+
+
+class LeaderboardSelf(BaseModel):
+    id: str
+    count: int
+    rank: int | None = None
+    last_evaluated: str | None = None
+
+
+class LeaderboardResponse(BaseModel):
+    total_evaluations: int
+    me: LeaderboardSelf | None = None
+    top: list[LeaderboardEntry]
+
+
 def iter_history_dicts(history_dir, user_id=None) -> Iterable[dict]:
     """Yield every saved report dict in a history dir (used by stats too).
 

@@ -9,7 +9,13 @@ Usage:
 Flow: health → create two near-identical references (A vs B, one word changed)
 → list → download B's audio as the "user" attempt → /evaluate/quick and
 /evaluate (A's reference vs B's attempt: high but <100, so the diff actually
-fires) → history list/detail → stats → delete. Exits non-zero on any failure.
+fires) → history list/detail → stats → leaderboard (extensive: shape, masking,
+per-user increments, ranking, truncation) → delete. Exits non-zero on any failure.
+
+The leaderboard checks run against the live server (single- or multi-worker).
+Counts are in-memory per worker and flushed every LEADERBOARD_FLUSH_SECONDS, so a
+read may land on a worker that hasn't seen an eval yet — we poll with a timeout
+that comfortably covers a 60s-flush server.
 
 The first run downloads the Kokoro (~330 MB) and Wav2Vec2 (~1.2 GB) models.
 All audio is real Kokoro speech synthesized by the server itself — no mic, no
@@ -171,7 +177,123 @@ def main() -> int:
             )
             assert stats["total_evaluations"] >= 2
 
-            # 9. delete both references
+            # 9. leaderboard — extensive checks against the live server.
+            #    Counts live in-memory per worker and flush periodically, so a
+            #    read may land on a worker that hasn't seen an eval yet; we poll.
+            LB_POLL = 90.0
+            _hex = set("0123456789abcdef")
+
+            def _lb(c: httpx.Client, limit: int = 50) -> dict:
+                r = c.get(f"{BASE_PATH}/leaderboard", params={"limit": limit})
+                r.raise_for_status()
+                return r.json()
+
+            def _poll_lb(c: httpx.Client, pred, label: str) -> dict:
+                deadline = time.time() + LB_POLL
+                last: dict | None = None
+                while time.time() < deadline:
+                    last = _lb(c)
+                    if pred(last):
+                        return last
+                    time.sleep(1.0)
+                raise AssertionError(
+                    f"leaderboard: {label} not satisfied within {LB_POLL:.0f}s; last={last}"
+                )
+
+            def _fresh_user() -> httpx.Client:
+                c = httpx.Client(base_url=base_url, timeout=TIMEOUT, verify=not args.insecure)
+                c.get(f"{BASE_PATH}/health")  # acquire the user_id cookie
+                return c
+
+            def _eval_against(c: httpx.Client, ref_id: str) -> dict:
+                r = c.post(
+                    f"{BASE_PATH}/evaluate",
+                    files={"audio": ("user.wav", user_bytes, "audio/wav")},
+                    data={"reference_id": ref_id},
+                )
+                r.raise_for_status()
+                return r.json()
+
+            def _me_count(lb: dict) -> int:
+                return lb["me"]["count"] if lb["me"] else 0
+
+            def _has(lb: dict, uid: str) -> bool:
+                return any(e["id"] == uid for e in lb["top"])
+
+            # 9a. shape + masking (cheap GETs)
+            lb0 = _lb(client)
+            assert isinstance(lb0["total_evaluations"], int) and lb0["total_evaluations"] >= 0
+            assert isinstance(lb0["top"], list)
+            for e in lb0["top"]:
+                assert set(e) >= {"rank", "id", "count", "last_evaluated"}
+                assert len(e["id"]) == 8 and set(e["id"]) <= _hex, f"masked id not 8 hex: {e['id']}"
+            # ranks dense + ordered from 1
+            if lb0["top"]:
+                ranks = [e["rank"] for e in lb0["top"]]
+                assert ranks == sorted(ranks) and ranks[0] == 1, f"ranks not dense: {ranks}"
+
+            # 9b. a brand-new user (no evals) sees its id with count 0, unranked
+            u_none = _fresh_user()
+            me_none = _lb(u_none)["me"]
+            assert me_none is not None, "new user should still get a me row (to show its id)"
+            assert me_none["count"] == 0 and me_none["rank"] is None
+            assert len(me_none["id"]) == 8  # masked id shown so they can find themselves
+            print(
+                "[e2e] leaderboard shape OK "
+                f"(total={lb0['total_evaluations']}, top={len(lb0['top'])}); "
+                f"new-user me id={me_none['id']} count=0 unranked"
+            )
+
+            # 9c. two users with a deterministic count split: u1=2, u2=1
+            u1, u2 = _fresh_user(), _fresh_user()
+            base_total = lb0["total_evaluations"]
+            _eval_against(u1, ref_a["id"])
+            _eval_against(u1, ref_a["id"])
+            _eval_against(u2, ref_a["id"])
+
+            # 9d. each user sees its own count (poll: covers cross-worker flush lag)
+            lb1 = _poll_lb(u1, lambda lb: _me_count(lb) >= 2, "u1 count>=2")
+            u1_id, u1_count, u1_rank = lb1["me"]["id"], lb1["me"]["count"], lb1["me"]["rank"]
+            assert set(u1_id) <= _hex and len(u1_id) == 8
+            assert lb1["me"]["last_evaluated"], "last_evaluated should be set after an eval"
+            print(f"[e2e] u1: id={u1_id} count={u1_count} rank=#{u1_rank}")
+
+            lb2 = _poll_lb(u2, lambda lb: _me_count(lb) >= 1, "u2 count>=1")
+            u2_id, u2_count, u2_rank = lb2["me"]["id"], lb2["me"]["count"], lb2["me"]["rank"]
+            print(f"[e2e] u2: id={u2_id} count={u2_count} rank=#{u2_rank}")
+
+            # 9e. global ranking: u1 (2) strictly ahead of u2 (1)
+            both = _poll_lb(
+                client,
+                lambda lb: _has(lb, u1_id) and _has(lb, u2_id),
+                "both users visible in top",
+            )
+            u1e = next(e for e in both["top"] if e["id"] == u1_id)
+            u2e = next(e for e in both["top"] if e["id"] == u2_id)
+            assert u1e["count"] > u2e["count"], f"u1 should outrank u2: {u1e} vs {u2e}"
+            assert u1e["rank"] < u2e["rank"], f"u1 rank should be better: {u1e} vs {u2e}"
+            print(
+                "[e2e] ranking OK: "
+                f"u1#{u1e['rank']}({u1e['count']}) > u2#{u2e['rank']}({u2e['count']})"
+            )
+
+            # 9f. total climbed by the 3 evals we just ran (eventually consistent)
+            final = _poll_lb(
+                client, lambda lb: lb["total_evaluations"] >= base_total + 3, "total += 3"
+            )
+            print(f"[e2e] total evaluations {base_total} -> {final['total_evaluations']}")
+
+            # 9g. limit truncation
+            limited = _lb(client, limit=1)
+            assert len(limited["top"]) <= 1, (
+                f"limit=1 should truncate top, got {len(limited['top'])}"
+            )
+
+            for c in (u_none, u1, u2):
+                c.close()
+            print("[e2e] leaderboard checks passed")
+
+            # 10. delete both references
             for rid in (ref_a["id"], ref_b["id"]):
                 d = client.delete(f"{BASE_PATH}/references/{rid}")
                 d.raise_for_status()

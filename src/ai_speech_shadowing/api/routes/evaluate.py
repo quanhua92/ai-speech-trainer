@@ -73,6 +73,14 @@ def _run_evaluation(
     # stamp reference_id onto the saved report for history/stats
     _stamp_reference_id(path, reference_id)
 
+    # bump the per-user evaluation count (in-memory; flushed to db.json later).
+    # Best-effort: a leaderboard failure must never break an evaluation.
+    if user_id:
+        try:
+            state.leaderboard.increment(user_id)
+        except Exception:
+            logger.warning("leaderboard increment failed", exc_info=True)
+
     # persist the user's attempt audio so history rows can replay it
     audio_url: str | None = None
     if attempt_bytes:

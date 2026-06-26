@@ -21,7 +21,14 @@ from ai_speech_shadowing.api.identity import (
     generate_token,
     hash_token,
 )
-from ai_speech_shadowing.api.routes import demo, evaluate, health, history, reference
+from ai_speech_shadowing.api.routes import (
+    demo,
+    evaluate,
+    health,
+    history,
+    leaderboard,
+    reference,
+)
 from ai_speech_shadowing.core.history import cleanup_old_reports
 from ai_speech_shadowing.tts.generator import PathEscapeError, cleanup_old_references
 
@@ -81,6 +88,20 @@ def _reference_cleanup_interval_seconds() -> float:
     except ValueError:
         hours = 1
     return max(1.0, hours * 3600.0)
+
+
+# Leaderboard flush — the in-memory counters are merged to db.json periodically.
+DEFAULT_LEADERBOARD_FLUSH_SECONDS: float = 60.0
+
+
+def _leaderboard_flush_seconds() -> float:
+    try:
+        secs = float(
+            os.environ.get("LEADERBOARD_FLUSH_SECONDS", str(DEFAULT_LEADERBOARD_FLUSH_SECONDS))
+        )
+        return max(1.0, secs)
+    except ValueError:
+        return DEFAULT_LEADERBOARD_FLUSH_SECONDS
 
 
 def create_app() -> FastAPI:
@@ -183,6 +204,7 @@ def create_app() -> FastAPI:
     app.include_router(evaluate.router, prefix="/api/v1")
     app.include_router(reference.router, prefix="/api/v1")
     app.include_router(history.router, prefix="/api/v1")
+    app.include_router(leaderboard.router, prefix="/api/v1")
     app.include_router(demo.router)  # "/" — the demo page, not an API resource
     return app
 
@@ -192,15 +214,24 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup/shutdown hook. Models stay lazy; cleanup tasks run periodically."""
     history_task = asyncio.create_task(_periodic_cleanup())
     reference_task = asyncio.create_task(_periodic_reference_cleanup())
+    leaderboard_task = asyncio.create_task(_periodic_leaderboard_flush())
     try:
         yield
     finally:
         history_task.cancel()
         reference_task.cancel()
+        leaderboard_task.cancel()
         with suppress(asyncio.CancelledError):
             await history_task
         with suppress(asyncio.CancelledError):
             await reference_task
+        with suppress(asyncio.CancelledError):
+            await leaderboard_task
+        # commit pending counts so they survive a normal restart
+        try:
+            get_state().leaderboard.flush()
+        except Exception:
+            logger.exception("leaderboard shutdown flush failed")
 
 
 async def _periodic_cleanup() -> None:
@@ -238,6 +269,29 @@ async def _periodic_reference_cleanup() -> None:
         except Exception:
             logger.exception("reference cleanup task failed")
         await asyncio.sleep(interval)
+
+
+async def _periodic_leaderboard_flush() -> None:
+    """Merge in-memory evaluation counts to db.json every ~minute if changed.
+
+    Per-worker phase offset (PID-based) + interval jitter spread the two
+    workers' flushes apart so the flock is rarely contended. The flock itself
+    makes simultaneous flushes correct regardless — jitter just smooths it.
+    """
+    import random
+
+    store = get_state().leaderboard
+    interval = _leaderboard_flush_seconds()
+    # per-worker phase offset: separate processes have separate pids
+    await asyncio.sleep(os.getpid() % 30)
+    while True:
+        try:
+            flushed = store.flush_if_dirty()
+            if flushed:
+                logger.info("leaderboard flushed %d increment(s)", flushed)
+        except Exception:
+            logger.exception("leaderboard flush task failed")
+        await asyncio.sleep(max(1.0, interval + random.uniform(-5.0, 5.0)))
 
 
 app = create_app()
