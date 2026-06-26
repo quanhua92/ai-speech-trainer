@@ -64,6 +64,29 @@ def main() -> int:
         default=3,
         help="number of /evaluate calls (shows cold -> warm per worker)",
     )
+    parser.add_argument(
+        "--until-warm",
+        action="store_true",
+        help="keep calling /evaluate until all workers are warm, then stop (overrides --rounds)",
+    )
+    parser.add_argument(
+        "--warm-secs",
+        type=float,
+        default=6.0,
+        help="latency threshold (s) below which a call counts as warm",
+    )
+    parser.add_argument(
+        "--stable",
+        type=int,
+        default=5,
+        help="consecutive warm calls required to declare all workers warm",
+    )
+    parser.add_argument(
+        "--max-rounds",
+        type=int,
+        default=40,
+        help="hard cap on /evaluate calls in --until-warm mode",
+    )
     args = parser.parse_args()
 
     if args.url:
@@ -115,15 +138,47 @@ def main() -> int:
             audio = client.get(f"{BASE_PATH}/references/{rid}/audio").content
             files = {"audio": ("user.wav", audio, "audio/wav")}
 
-            for i in range(args.rounds):
-                tag = " (cold?)" if i == 0 else ""
+            def one_evaluate(idx: int) -> float:
+                tag = " (cold?)" if idx == 1 else ""
                 _time(
-                    f"POST /evaluate #{i + 1}{tag}",
+                    f"POST /evaluate #{idx}{tag}",
                     lambda: client.post(
                         f"{BASE_PATH}/evaluate", files=files, data={"reference_id": rid}
                     ),
                     timings,
                 )
+                return timings[-1][1]
+
+            cold_hits = 0
+            if args.until_warm:
+                # Keep calling until `--stable` consecutive warm calls. Each cold
+                # spike is a worker's first load; if cold_hits keeps growing past
+                # the worker count, workers are crashing/respawning (OOM churn).
+                consecutive_warm = 0
+                i = 0
+                while i < args.max_rounds:
+                    i += 1
+                    dt = one_evaluate(i)
+                    if dt > args.warm_secs:
+                        cold_hits += 1
+                        consecutive_warm = 0
+                    else:
+                        consecutive_warm += 1
+                        if consecutive_warm >= args.stable:
+                            break
+                warm = [d for _, d in timings if d <= args.warm_secs]
+                if cold_hits <= max(args.stable, 3):
+                    status = "STABLE (one-off)"
+                else:
+                    status = "CHURNING (workers restarting?)"
+                print(
+                    f"\n[bench] until-warm: {i} calls, cold_hits={cold_hits} "
+                    f"-> {status}; warm median="
+                    f"{statistics.median(warm):.2f}s  min={min(warm):.2f}s"
+                )
+            else:
+                for i in range(args.rounds):
+                    one_evaluate(i + 1)
 
             _time(
                 "POST /evaluate/quick (TTS+eval)",
@@ -144,12 +199,13 @@ def main() -> int:
 
     _ = server_thread
 
-    evals = [dt for label, dt in timings if label.startswith("POST /evaluate #")]
-    if len(evals) >= 2:
-        print(
-            f"\n[bench] /evaluate: first={evals[0]:.2f}s  warm median="
-            f"{statistics.median(evals[1:]):.2f}s  min={min(evals[1:]):.2f}s"
-        )
+    if not args.until_warm:
+        evals = [dt for label, dt in timings if label.startswith("POST /evaluate #")]
+        if len(evals) >= 2:
+            print(
+                f"\n[bench] /evaluate: first={evals[0]:.2f}s  warm median="
+                f"{statistics.median(evals[1:]):.2f}s  min={min(evals[1:]):.2f}s"
+            )
     print("[bench] done")
     return 0
 
