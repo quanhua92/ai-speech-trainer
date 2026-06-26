@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -14,10 +15,19 @@ from ai_speech_shadowing.api.schemas import EvaluationResponse, build_evaluation
 from ai_speech_shadowing.core.audio import AudioLoadError, AudioSample
 from ai_speech_shadowing.core.feedback import evaluate as evaluate_pipeline
 from ai_speech_shadowing.core.history import save_report
+from ai_speech_shadowing.core.leaderboard import audio_hash
 from ai_speech_shadowing.core.preprocess import preprocess
 
 router = APIRouter(tags=["evaluate"])
 logger = logging.getLogger(__name__)
+
+
+def _leaderboard_min_score() -> int:
+    """Composite score (0-100) an evaluation must reach to count on the leaderboard."""
+    try:
+        return max(0, min(100, int(os.environ.get("LEADERBOARD_MIN_SCORE", "30"))))
+    except ValueError:
+        return 30
 
 
 def _decode_upload(upload: UploadFile) -> tuple[AudioSample, bytes]:
@@ -74,10 +84,13 @@ def _run_evaluation(
     _stamp_reference_id(path, reference_id)
 
     # bump the per-user evaluation count (in-memory; flushed to db.json later).
-    # Best-effort: a leaderboard failure must never break an evaluation.
-    if user_id:
+    # Only real attempts count: a minimum composite score gates out noise/silence,
+    # and the leaderboard dedupes replays of the same audio. Best-effort: a
+    # leaderboard failure must never break an evaluation.
+    if user_id and report.composite_score >= _leaderboard_min_score():
         try:
-            state.leaderboard.increment(user_id)
+            ahash = audio_hash(attempt_bytes) if attempt_bytes else None
+            state.leaderboard.increment(user_id, ahash)
         except Exception:
             logger.warning("leaderboard increment failed", exc_info=True)
 

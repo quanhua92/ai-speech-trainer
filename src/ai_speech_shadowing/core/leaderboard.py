@@ -8,7 +8,7 @@ Design (see ``docs/db.md`` for the full rationale):
 * Each evaluation bumps ``_cache`` and a per-worker ``_deltas`` map (a cheap
   ``threading.Lock`` guards the non-atomic ``count += 1``; sync handlers run in
   the anyio threadpool, so real threads mutate this concurrently).
-* A background task flushes every ~minute: under ``fcntl.flock`` on a stable
+* A background task flushes every ~15s (default): under ``fcntl.flock`` on a stable
   sidecar lock file it re-reads the shared ``db.json``, **adds** this worker's
   deltas on top, and writes back atomically (temp + ``os.replace``). Merging
   deltas (never the full cache) is what keeps counts correct across workers —
@@ -34,8 +34,10 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 DEFAULT_DB_PATH: Path = Path("data/storage/db.json")
+DEFAULT_DEDUP_DIR: Path = Path("data/storage/hashes")
 SCHEMA: int = 1
 _MASK_LEN: int = 8
+_HASH_LEN: int = 16
 
 
 # --------------------------------------------------------------------------- #
@@ -49,9 +51,45 @@ def _empty_state() -> dict[str, Any]:
     return {"schema": SCHEMA, "total_evaluations": 0, "users": {}, "updated_at": None}
 
 
+def _new_user() -> dict[str, Any]:
+    return {"count": 0, "last_evaluated": None}
+
+
 def mask_id(uid: str) -> str:
     """First 8 hex chars of a user id — enough to recognise yourself, not reversible."""
     return uid[:_MASK_LEN]
+
+
+def audio_hash(data: bytes) -> str:
+    """Short stable hash of an attempt's audio bytes — keys the per-user replay dedup."""
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest()[:_HASH_LEN]
+
+
+def _dedup_claim(path: Path) -> bool:
+    """Atomically claim a dedup slot via an exclusive file create.
+
+    ``O_CREAT | O_EXCL`` is atomic across processes on the same filesystem, so
+    two workers racing to count the same (user, audio) can't both win — no lock
+    needed. Returns True if we created the file (first time), False if it already
+    existed (replay → deduped). The empty files live under ``dedup_dir`` (default
+    ``data/storage/hashes``, inside the persisted mount) so dedup survives
+    restarts; they cost ~0 bytes each.
+    """
+    import errno
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            return False
+        raise
+    os.close(fd)
+    return True
 
 
 def _max_ts(a: str | None, b: str | None) -> str | None:
@@ -73,7 +111,7 @@ def _load(db_path: Path) -> dict[str, Any]:
         data["users"] = users
     for uid, u in list(users.items()):
         if not isinstance(u, dict):
-            users[uid] = {"count": 0, "last_evaluated": None}
+            users[uid] = _new_user()
             continue
         u.setdefault("count", 0)
         u.setdefault("last_evaluated", None)
@@ -124,9 +162,16 @@ class LeaderboardStore:
     ``db_path``; the API holds a singleton via ``EngineState``.
     """
 
-    def __init__(self, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    def __init__(
+        self,
+        db_path: str | Path = DEFAULT_DB_PATH,
+        dedup_dir: str | Path = DEFAULT_DEDUP_DIR,
+    ) -> None:
         self._db_path = Path(db_path)
         self._lock_path = self._db_path.with_name(self._db_path.name + ".lock")
+        # Empty-file-per-(user,audio) replay dedup. Lives under the persisted
+        # volume so it survives restarts; O_EXCL makes it lock-free across workers.
+        self._dedup_dir = Path(dedup_dir)
         self._lock = threading.Lock()
         self._cache: dict[str, Any] = _empty_state()
         self._deltas: dict[str, dict[str, Any]] = {}
@@ -137,27 +182,44 @@ class LeaderboardStore:
     def db_path(self) -> Path:
         return self._db_path
 
+    @property
+    def dedup_dir(self) -> Path:
+        return self._dedup_dir
+
     def _ensure_loaded(self) -> None:
         if not self._loaded:
             self._cache = _load(self._db_path)
             self._loaded = True
 
-    # ---- hot path (no disk) --------------------------------------------- #
-    def increment(self, uid: str) -> None:
-        """Bump the caller's count in memory + record a delta for the next flush."""
+    # ---- hot path (no db.json write) ------------------------------------ #
+    def increment(self, uid: str, audio_hash: str | None = None) -> bool:
+        """Count one evaluation for ``uid``, unless the same audio was counted
+        already (per-user replay dedup via an empty file under ``dedup_dir``).
+
+        Returns True when the count increased, False when deduped. The dedup
+        claim (``O_CREAT | O_EXCL``) is atomic across workers on the shared
+        filesystem, so no lock is needed for the dedup itself; only the in-memory
+        counter bump takes the thread lock.
+        """
         if not uid:
-            return
+            return False
+        if audio_hash:
+            # shard by the first hex char of the uid to avoid one giant directory
+            claim = self._dedup_dir / uid[0] / uid / audio_hash
+            if not _dedup_claim(claim):
+                return False  # replay of the same recording — don't double-count
         now = _now_iso()
         with self._lock:
             self._ensure_loaded()
-            d = self._deltas.setdefault(uid, {"count": 0, "last_evaluated": None})
-            d["count"] += 1
-            d["last_evaluated"] = now
-            u = self._cache["users"].setdefault(uid, {"count": 0, "last_evaluated": None})
+            u = self._cache["users"].setdefault(uid, _new_user())
             u["count"] += 1
             u["last_evaluated"] = now
             self._cache["total_evaluations"] += 1
+            d = self._deltas.setdefault(uid, {"count": 0, "last_evaluated": None})
+            d["count"] += 1
+            d["last_evaluated"] = now
             self._dirty = True
+            return True
 
     # ---- reads (no disk) ------------------------------------------------ #
     def snapshot(self) -> dict[str, Any]:
@@ -259,6 +321,32 @@ class LeaderboardStore:
             dirty = self._dirty
         return self.flush() if dirty else 0
 
+    def sync(self) -> int:
+        """Periodic tick: ship pending deltas AND refresh ``_cache`` from disk.
+
+        Without the refresh, a worker that only serves reads (never increments)
+        would never re-read ``db.json`` and its view would freeze at startup —
+        blind to counts other workers flush. So every tick we rebase
+        ``_cache = latest disk state + this worker's uncommitted deltas`` (writes
+        only when there are deltas). The disk read needs no ``flock``: ``os.replace``
+        makes ``db.json`` reads never torn.
+        """
+        written = self.flush()  # writes if dirty; no-op (no rebase) when clean
+        self._rebase_cache()
+        return written
+
+    def _rebase_cache(self) -> None:
+        """Recompute ``_cache`` from the latest on-disk state plus our deltas."""
+        with self._lock:
+            disk = _load(self._db_path)
+            users = disk["users"]
+            for uid, d in self._deltas.items():
+                u = users.setdefault(uid, _new_user())
+                u["count"] += d["count"]
+                u["last_evaluated"] = _max_ts(u.get("last_evaluated"), d.get("last_evaluated"))
+            disk["total_evaluations"] = sum(int(u["count"]) for u in users.values())
+            self._cache = disk
+
     def _merge_to_disk(self, deltas: dict[str, dict[str, Any]]) -> dict[str, Any]:
         """Re-read shared db.json, add our deltas, write atomically. Returns merged."""
         with _flock(self._lock_path):
@@ -278,3 +366,9 @@ def default_db_path() -> Path:
     """Resolve the DB path from ``LEADERBOARD_DB`` (default data/storage/db.json)."""
     env = os.environ.get("LEADERBOARD_DB")
     return Path(env) if env else DEFAULT_DB_PATH
+
+
+def default_dedup_dir() -> Path:
+    """Resolve the dedup dir from ``LEADERBOARD_DEDUP_DIR`` (default data/storage/hashes)."""
+    env = os.environ.get("LEADERBOARD_DEDUP_DIR")
+    return Path(env) if env else DEFAULT_DEDUP_DIR

@@ -91,7 +91,7 @@ def _reference_cleanup_interval_seconds() -> float:
 
 
 # Leaderboard flush — the in-memory counters are merged to db.json periodically.
-DEFAULT_LEADERBOARD_FLUSH_SECONDS: float = 60.0
+DEFAULT_LEADERBOARD_FLUSH_SECONDS: float = 15.0
 
 
 def _leaderboard_flush_seconds() -> float:
@@ -272,11 +272,14 @@ async def _periodic_reference_cleanup() -> None:
 
 
 async def _periodic_leaderboard_flush() -> None:
-    """Merge in-memory evaluation counts to db.json every ~minute if changed.
+    """Every ~15s: ship pending counts to db.json AND refresh the in-memory
+    cache from disk.
 
-    Per-worker phase offset (PID-based) + interval jitter spread the two
-    workers' flushes apart so the flock is rarely contended. The flock itself
-    makes simultaneous flushes correct regardless — jitter just smooths it.
+    The refresh matters for read-only workers: a worker that never increments
+    still rebases its cache so leaderboard reads see counts other workers
+    flushed (otherwise its view would freeze at startup). Per-worker phase
+    offset (PID-based) + interval jitter spread flushes apart so the flock is
+    rarely contended; flock keeps simultaneous flushes correct regardless.
     """
     import random
 
@@ -286,7 +289,7 @@ async def _periodic_leaderboard_flush() -> None:
     await asyncio.sleep(os.getpid() % 30)
     while True:
         try:
-            flushed = store.flush_if_dirty()
+            flushed = store.sync()
             if flushed:
                 logger.info("leaderboard flushed %d increment(s)", flushed)
         except Exception:

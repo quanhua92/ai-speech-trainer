@@ -82,20 +82,63 @@ _dirty:   bool    # set on any increment; cleared on a successful flush
 
 Reads (`GET /leaderboard`) are served from `_cache` — no disk I/O per read.
 
-## Write path — per evaluation (hot, no disk, no flock)
+## Write path — per evaluation
+
+An evaluation counts only if it is a **real attempt**: the composite score must
+reach `LEADERBOARD_MIN_SCORE` (default 30), and a replay of the **same audio**
+by the same user is deduped. The gate lives in the evaluate route; the store only
+does the count + dedup.
+
+### Score threshold (evaluate route)
 
 ```python
-def increment_user(uid):
-    now = iso_now()
-    with _thread_lock:
-        _deltas[uid] = _deltas.get(uid, 0) + 1
-        _cache["users"].setdefault(uid, {})["count"] += 1
-        _cache["users"][uid]["last_evaluated"] = now
-        _cache["total_evaluations"] += 1
-        _dirty = True
+if user_id and report.composite_score >= _leaderboard_min_score():   # default 30
+    store.increment(user_id, audio_hash(attempt_bytes))
 ```
 
-No disk, no `flock`. The lock is held only for these few dict ops.
+This filters out noise/silence/garbage submissions so they don't pad the count.
+The threshold is the outer gate — a below-threshold attempt never calls
+`increment` (and never claims a dedup slot), so a later good attempt with the
+same audio still counts.
+
+### Replay dedup — empty files under `data/storage/hashes/`
+
+`increment(uid, audio_hash)` claims one empty file per (user, audio) before
+bumping the count:
+
+```
+data/storage/hashes/<uid[0]>/<uid>/<audio_hash>   # 0-byte marker
+```
+
+The claim is `os.open(path, O_CREAT | O_EXCL)` — **atomic across workers** on the
+shared container filesystem, so two workers racing on the same recording can't
+both count it. No lock is needed for the dedup itself (only the in-memory counter
+bump takes the thread lock). If the file already exists, `increment` returns
+`False` and the count is unchanged.
+
+- The files live under the **persisted mount** (`data/storage/hashes`), so dedup
+  survives restarts; each costs ~0 bytes.
+- Dedup is **per user**: the same audio submitted by two different users counts
+  once for each.
+- `audio_hash` is the first 16 hex of `sha256(attempt_bytes)` — the uploaded
+  bytes are byte-identical on a replay (the browser re-sends the same blob), so
+  the hash is stable.
+
+### In-memory count bump (no db.json write)
+
+```python
+# after the dedup claim succeeds (or when audio_hash is None → no dedup)
+now = iso_now()
+with _thread_lock:
+    _cache["users"].setdefault(uid, {})["count"] += 1
+    _cache["users"][uid]["last_evaluated"] = now
+    _cache["total_evaluations"] += 1
+    _deltas[uid] += 1
+    _dirty = True
+```
+
+No db.json write, no `flock` on the hot path. The dedup file is the only disk
+touch, and it's a single atomic syscall.
 
 ## Read path — `GET /api/v1/leaderboard` (hot, no disk, no flock)
 
@@ -144,7 +187,8 @@ the writer (the snapshot copy is taken in microseconds).
 If a view ever needs to be exactly current (every worker's latest flushes), the
 endpoint can re-read `db.json` on each view instead of using `_cache`. That is
 still **no per-evaluation** disk cost — one read per page-load. Not enabled by
-default; the ~1 min memory lag is acceptable for a leaderboard.
+default; the ~15s memory lag (see [Eventual consistency](#eventual-consistency))
+is acceptable for a leaderboard.
 
 ## Flush — merge deltas, never overwrite (the cross-worker rule)
 
@@ -260,12 +304,16 @@ in one of exactly two states — old file intact, or new file fully intact.
 ## Flush scheduling & jitter
 
 A background asyncio task per worker (`_periodic_leaderboard_flush`, started in
-the app lifespan) loops: sleep, then flush if `_dirty`. Defaults:
+the app lifespan) loops: sleep, then `sync()` — write pending deltas if any AND
+rebase `_cache` from disk (so idle workers still see other workers' counts).
+Defaults:
 
 | Env var | Default | Effect |
 | --- | --- | --- |
-| `LEADERBOARD_FLUSH_SECONDS` | `60` | Flush interval |
+| `LEADERBOARD_FLUSH_SECONDS` | `15` | Flush interval |
 | `LEADERBOARD_DB` | `data/storage/db.json` | DB file path |
+| `LEADERBOARD_MIN_SCORE` | `30` | Composite score (0-100) an eval must reach to count |
+| `LEADERBOARD_DEDUP_DIR` | `data/storage/hashes` | Dir for the per-(user,audio) dedup marker files |
 
 `flock` already makes simultaneous flushes *safe* (they serialize). Jitter is
 added only to **reduce contention**, not to prevent breakage:
@@ -273,7 +321,7 @@ added only to **reduce contention**, not to prevent breakage:
 - **Per-worker initial phase offset** (PID-based, deterministic, immune to the
   fork-inherited-RNG pitfall): `await asyncio.sleep(os.getpid() % 30)` so the
   two workers' cycles phase-shift apart at boot.
-- **Interval jitter**: `await asyncio.sleep(60 + random.uniform(-5, 5))` so they
+- **Interval jitter**: `await asyncio.sleep(interval + random.uniform(-5, 5))` so they
   don't slowly re-sync.
 
 Net: the lock is almost never contended; if jitter ever failed to separate them,
@@ -305,11 +353,24 @@ project root.
 
 ## Eventual consistency
 
-Because each worker serves reads from its own `_cache`, a leaderboard view can
-be **~`LEADERBOARD_FLUSH_SECONDS` behind** the true global state — a worker only
-sees another worker's flushes on its *own* next flush (when it re-reads disk).
-This is acceptable for a leaderboard. If exact reads were ever required, the
-endpoint could re-read disk on each view (disk only — still not per-eval).
+Each worker serves reads from its own `_cache`. To keep that cache from going
+stale on an **idle worker** (one that only serves reads and never increments,
+so it would otherwise never re-read disk), the periodic task runs `sync()` every
+tick — not `flush_if_dirty()`. `sync()` does two things:
+
+1. `flush()` — write this worker's pending deltas to `db.json` (if any);
+2. `_rebase_cache()` — **always** recompute `_cache = latest disk state + this
+   worker's uncommitted deltas`.
+
+The rebase is a plain `_load(db.json)` (no `flock` needed — `os.replace` makes
+reads never torn) followed by re-applying the in-memory deltas, under the thread
+lock. So even a worker that has produced zero increments picks up the counts
+other workers flushed, every interval.
+
+Net: a leaderboard view can be **~`LEADERBOARD_FLUSH_SECONDS` behind** the true
+global state (default 15s), regardless of whether the serving worker is active
+or idle. This is acceptable for a leaderboard. If exact reads were ever required,
+the endpoint could re-read disk on each view (disk only — still not per-eval).
 
 ## Test coverage
 
@@ -320,6 +381,9 @@ endpoint could re-read disk on each view (disk only — still not per-eval).
 - masked id (first 8 hex)
 - missing / corrupt `db.json` → fresh start, never crash
 - delta-merge correctness across two simulated worker shards
+- idle worker refreshes its cache from disk via `sync()` (sees other workers' counts)
 - snapshot+clear: an increment during flush ships next cycle (no loss)
 - failed flush restores deltas (no loss)
 - atomic write (no half-written file observable)
+- replay dedup: same audio counts once (per user), distinct audios each count,
+  dedup survives a new store on the same dedup dir

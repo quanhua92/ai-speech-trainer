@@ -13,7 +13,11 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ai_speech_shadowing.core.leaderboard import LeaderboardStore, default_db_path
+from ai_speech_shadowing.core.leaderboard import (
+    LeaderboardStore,
+    default_db_path,
+    default_dedup_dir,
+)
 from ai_speech_shadowing.core.phoneme import PhonemeExtractor, get_extractor
 from ai_speech_shadowing.tts.generator import ReferenceConfig, ReferenceManager
 
@@ -24,7 +28,7 @@ _EXTRACTOR_RETRY_COOLDOWN: float = 30.0
 
 
 def _default_leaderboard() -> LeaderboardStore:
-    return LeaderboardStore(default_db_path())
+    return LeaderboardStore(default_db_path(), default_dedup_dir())
 
 
 @dataclass

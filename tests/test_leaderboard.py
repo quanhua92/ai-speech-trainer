@@ -27,7 +27,8 @@ from ai_speech_shadowing.core.leaderboard import (
 
 @pytest.fixture
 def store(tmp_path: Path) -> LeaderboardStore:
-    return LeaderboardStore(tmp_path / "db.json")
+    # isolated db + dedup dir per test (dedup is file-based on disk)
+    return LeaderboardStore(tmp_path / "db.json", tmp_path / "hashes")
 
 
 def _db_json(db_path: Path) -> dict:
@@ -58,6 +59,56 @@ class TestIncrementRead:
         lb = store.leaderboard()
         assert lb["total_evaluations"] == 1
         assert lb["top"][0]["count"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# replay dedup (audio-hash keyed, file-based)
+# --------------------------------------------------------------------------- #
+class TestDedup:
+    def test_same_audio_hash_counts_once(self, store: LeaderboardStore) -> None:
+        uid = "a" * 64
+        assert store.increment(uid, "h1") is True
+        assert store.increment(uid, "h1") is False  # replay → deduped
+        assert store.snapshot()["users"][uid]["count"] == 1
+
+    def test_different_audio_hashes_each_count(self, store: LeaderboardStore) -> None:
+        uid = "a" * 64
+        store.increment(uid, "h1")
+        store.increment(uid, "h2")
+        assert store.snapshot()["users"][uid]["count"] == 2
+
+    def test_dedup_is_per_user(self, store: LeaderboardStore) -> None:
+        # the same audio submitted by two different users counts once each
+        store.increment("a" * 64, "shared")
+        store.increment("b" * 64, "shared")
+        snap = store.snapshot()
+        assert snap["users"]["a" * 64]["count"] == 1
+        assert snap["users"]["b" * 64]["count"] == 1
+
+    def test_no_hash_always_counts(self, store: LeaderboardStore) -> None:
+        uid = "a" * 64
+        store.increment(uid)  # no audio hash → no dedup
+        store.increment(uid)
+        assert store.snapshot()["users"][uid]["count"] == 2
+
+    def test_dedup_claims_empty_files_on_disk(self, store: LeaderboardStore) -> None:
+        uid = "a" * 64
+        store.increment(uid, "h1")
+        claim = store.dedup_dir / uid[0] / uid / "h1"
+        assert claim.is_file()
+        assert claim.stat().st_size == 0
+
+    def test_dedup_survives_new_store_same_dir(self, tmp_path: Path) -> None:
+        # dedup files live on disk (independent of db.json) → a fresh process
+        # with the same dedup dir still dedupes; the count persists via flush.
+        db, hashes = tmp_path / "db.json", tmp_path / "hashes"
+        uid = "c" * 64
+        s1 = LeaderboardStore(db, hashes)
+        s1.increment(uid, "h1")
+        s1.flush()  # persist the count to disk
+        reloaded = LeaderboardStore(db, hashes)
+        assert reloaded.increment(uid, "h1") is False  # already claimed
+        assert reloaded.snapshot()["users"][uid]["count"] == 1
 
 
 # --------------------------------------------------------------------------- #
@@ -171,6 +222,22 @@ class TestCrossWorkerMerge:
         assert snap["users"]["x" * 64]["count"] == 2
         assert snap["users"]["y" * 64]["count"] == 1
         assert snap["total_evaluations"] == 3
+
+    def test_idle_worker_refreshes_from_disk_via_sync(self, tmp_path: Path) -> None:
+        # a read-only worker must still see counts another worker flushed,
+        # even though it has no deltas of its own to write.
+        db, hashes = tmp_path / "db.json", tmp_path / "hashes"
+        idle = LeaderboardStore(db, hashes)
+        idle.snapshot()  # force the cache to load (empty disk) and go stale
+        writer = LeaderboardStore(db, hashes)
+        writer.increment("a" * 64)
+        writer.flush()
+        # idle's cache is frozen at the pre-write snapshot
+        assert idle.snapshot()["total_evaluations"] == 0
+        # sync() rebases from disk → idle now sees the count
+        idle.sync()
+        assert idle.snapshot()["total_evaluations"] == 1
+        assert idle.snapshot()["users"]["a" * 64]["count"] == 1
 
     def test_interleaved_flushes_never_lose(self, tmp_path: Path) -> None:
         db = tmp_path / "db.json"

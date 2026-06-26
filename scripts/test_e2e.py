@@ -205,10 +205,10 @@ def main() -> int:
                 c.get(f"{BASE_PATH}/health")  # acquire the user_id cookie
                 return c
 
-            def _eval_against(c: httpx.Client, ref_id: str) -> dict:
+            def _eval_against(c: httpx.Client, ref_id: str, audio_bytes: bytes) -> dict:
                 r = c.post(
                     f"{BASE_PATH}/evaluate",
-                    files={"audio": ("user.wav", user_bytes, "audio/wav")},
+                    files={"audio": ("user.wav", audio_bytes, "audio/wav")},
                     data={"reference_id": ref_id},
                 )
                 r.raise_for_status()
@@ -244,19 +244,23 @@ def main() -> int:
                 f"new-user me id={me_none['id']} count=0 unranked"
             )
 
-            # 9c. two users with a deterministic count split: u1=2, u2=1
+            # 9c. u1 evaluates with two DIFFERENT audios (count 2); u2 with one
+            #     (count 1). A replay of an already-counted audio must NOT raise
+            #     the count (per-user audio dedup).
+            audio_a = client.get(f"{BASE_PATH}/references/{ref_a['id']}/audio").content
             u1, u2 = _fresh_user(), _fresh_user()
             base_total = lb0["total_evaluations"]
-            _eval_against(u1, ref_a["id"])
-            _eval_against(u1, ref_a["id"])
-            _eval_against(u2, ref_a["id"])
+            _eval_against(u1, ref_a["id"], audio_a)  # +1
+            _eval_against(u1, ref_a["id"], user_bytes)  # +1 (different audio)
+            _eval_against(u1, ref_a["id"], audio_a)  # replay → deduped, no count
+            _eval_against(u2, ref_a["id"], user_bytes)  # +1 for u2 (per-user dedup)
 
             # 9d. each user sees its own count (poll: covers cross-worker flush lag)
-            lb1 = _poll_lb(u1, lambda lb: _me_count(lb) >= 2, "u1 count>=2")
+            lb1 = _poll_lb(u1, lambda lb: _me_count(lb) == 2, "u1 count==2 (dedup held)")
             u1_id, u1_count, u1_rank = lb1["me"]["id"], lb1["me"]["count"], lb1["me"]["rank"]
             assert set(u1_id) <= _hex and len(u1_id) == 8
             assert lb1["me"]["last_evaluated"], "last_evaluated should be set after an eval"
-            print(f"[e2e] u1: id={u1_id} count={u1_count} rank=#{u1_rank}")
+            print(f"[e2e] u1: id={u1_id} count={u1_count} rank=#{u1_rank} (3 evals, 1 deduped)")
 
             lb2 = _poll_lb(u2, lambda lb: _me_count(lb) >= 1, "u2 count>=1")
             u2_id, u2_count, u2_rank = lb2["me"]["id"], lb2["me"]["count"], lb2["me"]["rank"]
