@@ -9,6 +9,11 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    # spaCy model misaki's G2P needs at runtime (TTS + word alignment). NOT on
+    # PyPI — installed from the spaCy-models GitHub release. Baked via uv sync
+    # so misaki never calls spacy.cli.download at runtime (which fails offline
+    # / non-root: uv venvs ship no pip). Pinned to 3.8.0 to match spacy 3.8.x.
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
     "fastapi>=0.138.0",
     "fastdtw>=0.3.4",
     "kokoro>=0.9.4",
@@ -34,6 +39,12 @@ ai-speech-shadowing = "ai_speech_shadowing:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+# en-core-web-sm (the spaCy model misaki needs) is a direct-URL dependency —
+# spaCy models aren't on PyPI, only on the spaCy-models GitHub releases.
+# Hatchling requires this flag to accept PEP 508 direct references.
+allow-direct-references = true
 
 [dependency-groups]
 dev = [
