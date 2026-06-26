@@ -61,9 +61,14 @@
       <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-ref">1 · Reference (native target)</h2>
       <div class="flex gap-2 flex-wrap items-start">
         <textarea id="ref-text" placeholder="Type a sentence to synthesize…" rows="2" class="flex-1 min-w-[200px] bg-panel2 border border-border text-text rounded-md px-2.5 py-2 text-sm resize-vertical" style="font-family:inherit"></textarea>
-        <button onclick="createReference()" id="btn-gen" class="bg-accent text-bg border-0 rounded-md px-3.5 py-2 text-sm font-semibold cursor-pointer">Generate</button>
+        <button onclick="createReference()" id="btn-gen" class="bg-accent text-bg border-0 rounded-lg px-5 py-3 text-base font-semibold cursor-pointer w-full sm:w-auto">Generate</button>
       </div>
-      <div class="mt-2.5">
+      <div class="flex items-center gap-3 my-3">
+        <hr class="flex-1 border-0 border-t border-border" />
+        <span class="text-muted text-[11px] uppercase tracking-wider whitespace-nowrap" id="ref-or-label">or pick an existing reference</span>
+        <hr class="flex-1 border-0 border-t border-border" />
+      </div>
+      <div class="mt-0">
         <select id="ref-select" onchange="playSelectedReference()" class="w-full bg-panel2 border border-border text-text rounded-md px-2.5 py-2 text-sm">
           <option value="">— existing references —</option>
         </select>
@@ -87,7 +92,7 @@
     <section class="bg-panel border border-border rounded-xl p-4">
       <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-att">2 · Your attempt</h2>
       <div class="flex gap-2 flex-wrap items-center">
-        <button id="rec-btn" onclick="toggleRecording()" class="bg-accent text-bg border-0 rounded-md px-3.5 py-2 text-sm font-semibold cursor-pointer">Record</button>
+        <button id="rec-btn" onclick="toggleRecording()" class="bg-accent text-bg border-0 rounded-lg px-5 py-3 text-base font-semibold cursor-pointer w-full sm:w-auto">Record</button>
         <span id="rec-status" class="text-muted text-xs">or</span>
         <input type="file" id="file-input" accept=".wav,.flac,.ogg,.mp3" class="text-xs" />
       </div>
@@ -98,8 +103,8 @@
     <!-- 3 · Evaluate -->
     <section class="bg-panel border border-border rounded-xl p-4">
       <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-eval">3 · Evaluate</h2>
-      <div class="flex gap-2 items-center">
-        <button onclick="runEvaluate()" id="eval-btn" class="bg-accent text-bg border-0 rounded-md px-3.5 py-2 text-sm font-semibold cursor-pointer">Evaluate</button>
+      <div class="flex gap-2 flex-wrap items-center">
+        <button onclick="runEvaluate()" id="eval-btn" class="bg-accent text-bg border-0 rounded-lg px-5 py-3 text-base font-semibold cursor-pointer w-full sm:w-auto">Evaluate</button>
         <span id="eval-status" class="text-muted text-xs"></span>
       </div>
       <details class="mt-2.5">
@@ -127,6 +132,10 @@
     <section id="results" class="bg-panel border border-border rounded-xl p-4">
       <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-res">4 · Results</h2>
       <div id="results-empty" class="text-muted text-sm py-8 text-center">Record an attempt and click Evaluate to see scores, phoneme alignment, and feedback here.</div>
+      <div id="results-loading" class="hidden text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-7 w-7 border-2 border-border border-t-accent"></div>
+        <div class="text-muted text-sm mt-2" id="results-loading-text">Evaluating…</div>
+      </div>
       <div id="results-content" class="hidden">
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-2" id="score-cards"></div>
         <h3 class="text-xs text-muted mt-3.5 mb-1" id="h3-word">Word highlight <span class="text-muted">(best-effort)</span></h3>
@@ -182,6 +191,15 @@ async function jpost(url, body) {
 }
 function setStatus(el, msg, isErr) { el.textContent = msg; el.className = isErr ? "text-bad text-xs" : "text-muted text-xs"; }
 function gradeClass(g) { return "g-" + (g || ""); }
+// Spinner SVG injected into buttons during async work.
+const SPIN = '<svg class="animate-spin inline-block align-middle w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"/></svg>';
+// Toggle the three mutually-exclusive results states: empty / loading / content.
+function setResultsState(state) {
+  document.getElementById("results-empty").classList.toggle("hidden", state !== "empty");
+  document.getElementById("results-loading").classList.toggle("hidden", state !== "loading");
+  document.getElementById("results-content").classList.toggle("hidden", state !== "content");
+  if (state === "loading") document.getElementById("results-loading-text").textContent = t("evaluating");
+}
 // HTML-escape server-derived strings before they reach innerHTML. Server data
 // (reference text -> word-diff, feedback, phoneme labels) must never be
 // interpreted as markup: a stored "<svg/onload=...>" reference would otherwise
@@ -379,20 +397,26 @@ async function runEvaluate() {
 async function runEval(fn) {
   const st = document.getElementById("eval-status");
   const btn = document.getElementById("eval-btn");
-  btn.disabled = true; setStatus(st, "Evaluating (first call loads models)…");
+  btn.disabled = true;
+  btn.innerHTML = `${SPIN}${t("evaluating")}`;
+  setResultsState("loading");
+  setStatus(st, t("eval_status"));
   try {
     const res = await fn();
     renderResults(res);
     setStatus(st, `Done — ${res.id}`);
     loadHistory(); refreshHealth();
-  } catch (e) { setStatus(st, e.message, true); }
+  } catch (e) {
+    setStatus(st, e.message, true);
+    setResultsState("empty");
+  }
   btn.disabled = false;
+  btn.textContent = t("evaluate");
 }
 
 /* ---------- results ---------- */
 function renderResults(res) {
-  document.getElementById("results-empty").classList.add("hidden");
-  document.getElementById("results-content").classList.remove("hidden");
+  setResultsState("content");
   const s = res.scores;
   const card = (label, block) => `<div class="bg-panel2 border border-border rounded-lg p-3">
     <div class="text-muted text-[11px] uppercase tracking-wide">${label}</div>
@@ -477,7 +501,12 @@ async function viewHistory(id) {
     const data = await jget(`${API}/history/${id}`);
     renderResults({ id: data.id, scores: { ...data.scores, composite: data.composite }, phoneme_diff: data.phoneme_diff || [], reference_phoneme_source: data.reference_phoneme_source || null, reference_phonemes: data.reference_phonemes || [], user_phonemes: data.user_phonemes || [], words: data.words || [], feedback: data.feedback || [] });
     const rid = data.reference_id;
-    if (rid) { const sel = document.getElementById("ref-select"); if ([...sel.options].some(o => o.value === rid)) sel.value = rid; setAudio("ref-audio", `${API}/references/${rid}/audio`, "ref(history)"); }
+    if (rid) {
+      const sel = document.getElementById("ref-select");
+      const opt = [...sel.options].find(o => o.value === rid);
+      if (opt) { sel.value = rid; document.getElementById("ref-text-display").textContent = opt.dataset.text || ""; }
+      setAudio("ref-audio", `${API}/references/${rid}/audio`, "ref(history)");
+    }
     if (data.audio_url) {
       setAudio("user-audio", data.audio_url, "attempt(history)");
       try { const resp = await fetch(data.audio_url); userBlob = await resp.blob(); document.getElementById("user-info").textContent = "loaded — ready to re-evaluate"; } catch {}
@@ -489,19 +518,23 @@ async function viewHistory(id) {
 const I18N = {
   en: { subtitle:"local-first speech evaluation", existing:"— existing references —",
     gen:"Generate", refresh:"Refresh", record:"Record", evaluate:"Evaluate",
+    evaluating:"Evaluating…", eval_status:"Evaluating (first call loads models)…",
     advanced:"Advanced settings", no_history:"No evaluations yet.", del:"Delete", rec_or:"or",
     card_pron:"Pronunciation", card_into:"Intonation", card_flu:"Fluency", card_comp:"Composite",
     grades:{good:"Good",fair:"Fair",needs_work:"Needs Work"},
     s1:"1 · Reference", s2:"2 · Your attempt", s3:"3 · Evaluate", s4:"4 · Results", s5:"5 · History",
     ref_ph:"Type a sentence to synthesize…",
+    ref_or_label:"or pick an existing reference",
   },
   vi: { subtitle:"luyện phát âm với AI", existing:"— bản dịch có sẵn —",
     gen:"Tạo", refresh:"Làm mới", record:"Ghi âm", evaluate:"Đánh giá",
+    evaluating:"Đang đánh giá…", eval_status:"Đang đánh giá (lần đầu sẽ tải mô hình)…",
     advanced:"Cài đặt nâng cao", no_history:"Chưa có đánh giá nào.", del:"Xoá", rec_or:"hoặc",
     card_pron:"Phát âm", card_into:"Ngữ điệu", card_flu:"Nhịp điệu", card_comp:"Tổng hợp",
     grades:{good:"Tốt",fair:"Tạm được",needs_work:"Cần cải thiện"},
     s1:"1 · Bản dịch chuẩn", s2:"2 · Bản ghi âm", s3:"3 · Đánh giá", s4:"4 · Kết quả", s5:"5 · Lịch sử",
     ref_ph:"Nhập câu cần tổng hợp…",
+    ref_or_label:"hoặc chọn bản dịch có sẵn",
   },
 };
 let LANG = localStorage.getItem("lang") || "en";
@@ -516,6 +549,7 @@ function applyI18n() {
   document.getElementById("title-res").textContent = m.s4;
   document.getElementById("title-hist").textContent = m.s5;
   document.getElementById("ref-text").placeholder = m.ref_ph;
+  document.getElementById("ref-or-label").textContent = m.ref_or_label;
   document.getElementById("btn-gen").textContent = m.gen;
   const rb = document.getElementById("rec-btn"); if (rb.textContent !== "Stop") rb.textContent = m.record;
   document.getElementById("rec-status").textContent = m.rec_or;
