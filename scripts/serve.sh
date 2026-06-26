@@ -91,6 +91,11 @@ fi
 # LEADERBOARD_FLUSH_SECONDS. Shorter here so the e2e test (and the UI) see new
 # evaluations quickly during local dev; prod overrides as needed.
 export LEADERBOARD_FLUSH_SECONDS="${LEADERBOARD_FLUSH_SECONDS:-10}"
+
+# Dev: serve static/index.html fresh on every request (no browser caching) so
+# edits show on a plain reload — no restart, no hard-refresh. Prod leaves this
+# unset and caches the HTML once at import.
+export STATIC_NOCACHE="${STATIC_NOCACHE:-1}"
 LOG="/tmp/ai-speech-shadowing-${PORT}.log"
 if [ -t 1 ]; then
   exec uv run ai-speech-shadowing serve \

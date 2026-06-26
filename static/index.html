@@ -30,6 +30,12 @@
   .g-good { color:var(--color-good); }
   .g-fair { color:var(--color-fair); }
   .g-needs_work { color:var(--color-bad); }
+  /* leaderboard "online" dot — green when the user evaluated in the last 15m */
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--color-border); flex-shrink:0; }
+  .dot.on { background:var(--color-good); }
+  .lb-id { cursor:pointer; border-bottom:1px dotted var(--color-muted); }
+  .lb-time { display:none; color:var(--color-muted); font-size:11px; }
+  .lb-time.show { display:inline; }
 </style>
 </head>
 <body class="bg-bg text-text min-h-screen" style="font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
@@ -157,7 +163,7 @@
     <!-- 5 · History -->
     <section class="bg-panel border border-border rounded-xl p-4 flex flex-col">
       <h2 class="text-xs uppercase tracking-wider text-muted mb-3" id="title-hist">5 · History</h2>
-      <div id="history-list" class="lg:max-h-[45vh] lg:overflow-y-auto flex-1"></div>
+      <div id="history-list" class="lg:max-h-[45vh] lg:min-h-0 lg:overflow-y-auto overflow-x-hidden flex-1"></div>
     </section>
 
     <!-- 6 · Leaderboard -->
@@ -493,11 +499,11 @@ async function loadHistory() {
     const el = document.getElementById("history-list");
     if (!h.items.length) { el.innerHTML = `<div class="text-muted text-xs">${t("no_history")}</div>`; return; }
     el.innerHTML = h.items.map(it =>
-      `<div class="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer hover:bg-panel2" onclick="viewHistory('${it.id}')">
-         <span class="font-mono text-xs">${it.id}</span>
-         <span class="${gradeClass(it.composite_grade)}">${it.composite_score}/100 ${gradeLabel(it.composite_grade)}</span>
-         <span class="text-muted text-xs">${it.created_at}</span>
-         <button class="ml-auto bg-bad text-bg rounded-md px-2 py-1 text-xs font-semibold border-0 cursor-pointer" onclick="event.stopPropagation();deleteHistory('${it.id}')">${t("del")}</button>
+      `<div class="flex items-center gap-2 min-w-0 px-2.5 py-2 rounded-md cursor-pointer hover:bg-panel2" onclick="viewHistory('${it.id}')">
+         <span class="font-mono text-xs shrink-0">${it.id}</span>
+         <span class="shrink-0 ${gradeClass(it.composite_grade)}">${it.composite_score}/100 ${gradeLabel(it.composite_grade)}</span>
+         <span class="text-muted text-xs min-w-0 truncate">${it.created_at}</span>
+         <button class="ml-auto shrink-0 bg-bad text-bg rounded-md px-2 py-1 text-xs font-semibold border-0 cursor-pointer" onclick="event.stopPropagation();deleteHistory('${it.id}')">${t("del")}</button>
        </div>`).join("");
   } catch (e) { console.error(e); }
 }
@@ -530,12 +536,25 @@ async function loadLeaderboard() {
       const myId = lb.me ? lb.me.id : null;
       listEl.innerHTML = lb.top.map(e => {
         const cls = e.id === myId ? "text-accent font-bold" : "text-text";
-        return `<div class="${cls}"><span class="text-muted w-7 inline-block">#${e.rank}</span> ${e.id} <b class="float-right">${e.count}</b></div>`;
+        const online = e.last_evaluated && (Date.now() - new Date(e.last_evaluated).getTime()) <= 15 * 60 * 1000;
+        const ts = e.last_evaluated ? new Date(e.last_evaluated).toLocaleString() : "";
+        return `<div class="${cls} flex items-center gap-1.5">`
+          + `<span class="dot ${online ? "on" : ""}" title="${t("lb_online_hint")}"></span>`
+          + `<span class="text-muted w-6 inline-block">#${e.rank}</span>`
+          + `<span class="lb-id" title="${t("lb_last")} ${ts}" onclick="toggleLbTime(this)">${e.id}</span>`
+          + `<span class="lb-time">${ts}</span>`
+          + `<b class="ml-auto">${e.count}</b></div>`;
       }).join("");
     } else {
       listEl.innerHTML = `<div class="text-muted">${t("lb_empty")}</div>`;
     }
   } catch (e) { console.error(e); }
+}
+// Tap/click a leaderboard id to reveal its last-evaluated time (touch-friendly:
+// the native title tooltip doesn't fire on mobile taps).
+function toggleLbTime(el) {
+  const time = el.parentElement.querySelector(".lb-time");
+  if (time) time.classList.toggle("show");
 }
 async function viewHistory(id) {
   try {
@@ -569,7 +588,7 @@ const I18N = {
     ref_ph:"Type a sentence to synthesize…",
     ref_or_label:"or pick an existing reference",
     lb_total:"Total", lb_you:"You", lb_evals:"evals", lb_rank:"rank", lb_last:"last", lb_empty:"No data yet.",
-    lb_myid:"My id", lb_unranked:"not ranked yet",
+    lb_myid:"My id", lb_unranked:"not ranked yet", lb_online_hint:"active in the last 15 min",
   },
   vi: { subtitle:"luyện phát âm với AI", existing:"— bản dịch có sẵn —",
     gen:"Tạo", refresh:"Làm mới", record:"Ghi âm", evaluate:"Đánh giá",
@@ -583,7 +602,7 @@ const I18N = {
     ref_ph:"Nhập câu cần tổng hợp…",
     ref_or_label:"hoặc chọn bản dịch có sẵn",
     lb_total:"Tổng", lb_you:"Bạn", lb_evals:"lần", lb_rank:"hạng", lb_last:"gần nhất", lb_empty:"Chưa có dữ liệu.",
-    lb_myid:"ID của bạn", lb_unranked:"chưa xếp hạng",
+    lb_myid:"ID của bạn", lb_unranked:"chưa xếp hạng", lb_online_hint:"hoạt động trong 15 phút qua",
   },
 };
 let LANG = localStorage.getItem("lang") || "en";
