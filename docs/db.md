@@ -340,14 +340,22 @@ tradeoff for "no per-request disk."
 ```yaml
 # docker-compose.yml
 volumes:
-  - app-data:/app/data
-  - ./data/storage:/app/data/storage   # leaderboard db.json — host-persistent
+  - app-data:/app/data   # named volume — persists history, references, AND the leaderboard
 ```
 
-The bind mount takes precedence for that subpath, so `db.json` lives on the host
-and survives image rebuilds (and is directly inspectable). Local dev
-(`scripts/serve.sh`) uses the same `data/storage/db.json` path relative to the
-project root.
+`db.json` and `hashes/` live at `/app/data/storage/` **inside the named volume**
+— no separate bind mount. The named volume persists across rebuilds and
+`down`/`up` (only `down -v` wipes it), which is what makes the leaderboard
+survive restarts.
+
+> **Why not a bind mount?** A bind mount of `./data/storage` *nested inside* the
+> named volume would be created root-owned on the host; the container runs as a
+> non-root user, so the app couldn't create `data/storage/hashes/…` →
+> `PermissionError` on every counted evaluation. The named volume's ownership
+> matches the image's `/app/data`, so writes just work.
+
+Local dev (`scripts/serve.sh`) uses the same `data/storage/db.json` path relative
+to the project root — no Docker involved.
 
 `data/storage/` is git-ignored — the db.json is runtime state, not source.
 

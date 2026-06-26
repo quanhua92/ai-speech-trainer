@@ -17,13 +17,13 @@ services:
       # → ~4 GB, well within the 8 GB limit below with headroom for overhead.
       WORKERS: "2"
     volumes:
-      # Named volume → persists user recordings, history, and any new references.
-      # On first create Docker seeds it from the image's /app/data (the bundled
-      # default references), so the demo is populated immediately.
+      # Named volume → persists user recordings, history, references, AND the
+      # leaderboard (data/storage/{db.json,hashes}). On first create Docker seeds
+      # it from the image's /app/data (the bundled default references); it then
+      # survives rebuilds and `down`/`up` (only `down -v` wipes it). No separate
+      # bind mount: a nested bind mount would be root-owned on the host and the
+      # non-root container couldn't write to it.
       - app-data:/app/data
-      # Leaderboard db.json — host-persistent (survives rebuilds, inspectable).
-      # Nested bind mount takes precedence for this subpath.
-      - ./data/storage:/app/data/storage
     restart: unless-stopped
     mem_limit: 8g
     logging:
