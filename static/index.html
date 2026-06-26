@@ -73,17 +73,20 @@
           <option value="">— existing references —</option>
         </select>
       </div>
-      <div class="flex gap-2 items-center mt-2">
-        <select id="voice-lang" onchange="updateVoices();saveSettings()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs">
-          <option value="en">English (US)</option>
-          <option value="en-gb">English (UK)</option>
-          <option value="es">Español</option>
-          <option value="fr">Français</option>
-          <option value="ja">Japanese</option>
-          <option value="zh">Chinese</option>
-        </select>
-        <select id="voice-name" onchange="saveSettings();playSelectedReference()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs"></select>
-      </div>
+      <details class="mt-2">
+        <summary class="text-muted text-xs cursor-pointer" id="summary-voice">Voice &amp; language</summary>
+        <div class="flex gap-2 flex-wrap items-center mt-2">
+          <select id="voice-lang" onchange="updateVoices();saveSettings()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs">
+            <option value="en">English (US)</option>
+            <option value="en-gb">English (UK)</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+            <option value="ja">Japanese</option>
+            <option value="zh">Chinese</option>
+          </select>
+          <select id="voice-name" onchange="saveSettings();playSelectedReference()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs"></select>
+        </div>
+      </details>
       <div id="ref-text-display" class="text-sm text-text mt-2 mb-1 italic"></div>
       <audio id="ref-audio" controls class="w-full mt-2"></audio>
     </section>
@@ -520,6 +523,7 @@ const I18N = {
     gen:"Generate", refresh:"Refresh", record:"Record", evaluate:"Evaluate",
     evaluating:"Evaluating…", eval_status:"Evaluating (first call loads models)…",
     advanced:"Advanced settings", no_history:"No evaluations yet.", del:"Delete", rec_or:"or",
+    voice_lang:"Voice & language",
     card_pron:"Pronunciation", card_into:"Intonation", card_flu:"Fluency", card_comp:"Composite",
     grades:{good:"Good",fair:"Fair",needs_work:"Needs Work"},
     s1:"1 · Reference", s2:"2 · Your attempt", s3:"3 · Evaluate", s4:"4 · Results", s5:"5 · History",
@@ -530,6 +534,7 @@ const I18N = {
     gen:"Tạo", refresh:"Làm mới", record:"Ghi âm", evaluate:"Đánh giá",
     evaluating:"Đang đánh giá…", eval_status:"Đang đánh giá (lần đầu sẽ tải mô hình)…",
     advanced:"Cài đặt nâng cao", no_history:"Chưa có đánh giá nào.", del:"Xoá", rec_or:"hoặc",
+    voice_lang:"Giọng đọc & ngôn ngữ",
     card_pron:"Phát âm", card_into:"Ngữ điệu", card_flu:"Nhịp điệu", card_comp:"Tổng hợp",
     grades:{good:"Tốt",fair:"Tạm được",needs_work:"Cần cải thiện"},
     s1:"1 · Bản dịch chuẩn", s2:"2 · Bản ghi âm", s3:"3 · Đánh giá", s4:"4 · Kết quả", s5:"5 · Lịch sử",
@@ -555,6 +560,7 @@ function applyI18n() {
   document.getElementById("rec-status").textContent = m.rec_or;
   document.getElementById("eval-btn").textContent = m.evaluate;
   document.getElementById("summary-adv").textContent = m.advanced;
+  document.getElementById("summary-voice").textContent = m.voice_lang;
   loadHistory();
 }
 function changeLang() { LANG = document.getElementById("ui-lang").value; localStorage.setItem("lang", LANG); applyI18n(); }
