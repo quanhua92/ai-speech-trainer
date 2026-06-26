@@ -72,7 +72,7 @@ COPY static/                          /app/static/
 # package tree would let an audio-parsing RCE trojanize installed libraries,
 # undoing the non-root hardening.
 RUN adduser --system --group --home /home/appuser appuser \
-    && mkdir -p /app/data/history /app/data/recordings \
+    && mkdir -p /app/data/history /app/data/recordings /app/data/storage \
     && chown -R appuser:appuser /app/data
 
 USER appuser
