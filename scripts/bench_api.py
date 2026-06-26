@@ -140,6 +140,12 @@ def main() -> int:
 
             def one_evaluate(idx: int) -> float:
                 tag = " (cold?)" if idx == 1 else ""
+                # Defeat nginx cookie-stickiness: the first response set a
+                # `user_id` cookie that httpx persists, which would pin every
+                # call to ONE worker. Clearing the jar makes each /evaluate
+                # cookie-less → nginx hashes $request_id → round-robins across
+                # workers, so --until-warm actually warms ALL of them.
+                client.cookies.clear()
                 _time(
                     f"POST /evaluate #{idx}{tag}",
                     lambda: client.post(
